@@ -1,0 +1,26 @@
+---
+import '../styles/global.css';
+import { ChartEstadistico } from '../components/ui/chart-estadistico';
+import { SidebarLayout } from '../components/sidebar-layout';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Reporte Estadístico - Sistema Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout 
+			client:load
+			title="Reporte Estadístico"
+			description="Análisis detallado de recaudación"
+		>
+			<ChartEstadistico client:load />
+		</SidebarLayout>
+	</body>
+</html>

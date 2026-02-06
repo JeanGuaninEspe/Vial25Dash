@@ -1,0 +1,26 @@
+---
+import '../styles/global.css';
+import { SidebarLayout } from '../components/sidebar-layout';
+import { TableFacturacion } from '../components/ui/table-facturacion';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Facturación - Sistema de Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout 
+			client:load
+			title="Facturación"
+			description="Gestión de facturas y reportes"
+		>
+			<TableFacturacion client:load />
+		</SidebarLayout>
+	</body>
+</html>

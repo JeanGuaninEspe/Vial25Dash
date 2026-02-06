@@ -1,0 +1,36 @@
+---
+import '../styles/global.css';
+import { ChartAreaInteractive } from '../components/ui/chart-area-interactive';
+import { ChartTransito } from '../components/ui/chart-transito';
+import { ChartRadialStacked } from '../components/ui/chart-radial-stacked';
+import { SidebarLayout } from '../components/sidebar-layout';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Dashboard - Recaudacion Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout 
+			client:load
+			title="Dashboard de Peajes"
+			description="Sistema de monitoreo y análisis"
+		>
+			<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+				<div class="md:col-span-2 lg:col-span-2">
+					<ChartAreaInteractive client:load />
+				</div>
+				<div class="md:col-span-2 lg:col-span-1">
+					<ChartRadialStacked client:load />
+				</div>
+			</div>
+			<ChartTransito client:load />
+		</SidebarLayout>
+	</body>
+</html>

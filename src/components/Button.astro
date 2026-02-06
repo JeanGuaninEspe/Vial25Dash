@@ -1,19 +1,22 @@
 ---
-// Click button, get confetti!
-// Styled by Tailwind :)
+import { Button } from "@/components/ui/button"
 ---
 
-<button
-	class="appearance-none py-2 px-4 bg-purple-500 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75"
->
-	<slot />
-</button>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Astro + TailwindCSS</title>
+	</head>
 
-<script>
-	import confetti from 'canvas-confetti';
-	const button = document.body.querySelector('button');
-
-	if (button) {
-		button.addEventListener('click', () => confetti());
-	}
-</script>
+	<body>
+		<div className="grid place-items-center h-screen content-center">
+		
+<Button client:load>
+  Filtrar
+</Button>
+		</div>
+	</body>
+</html>
