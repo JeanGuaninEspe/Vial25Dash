@@ -1,4 +1,6 @@
 import * as React from "react"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 import {
   Card,
   CardContent,
@@ -13,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 type FacturaRow = {
   FECHA_FACTURA: string
@@ -41,7 +44,10 @@ const BASE_URL = import.meta.env.PUBLIC_BASE_URL
 const ENDPOINT = "/facturacion"
 
 export function TableFacturacion() {
-  const [timeRange, setTimeRange] = React.useState("7d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [peaje, setPeaje] = React.useState("all")
   const [turno, setTurno] = React.useState("all")
   const [data, setData] = React.useState<FacturaRow[]>([])
@@ -55,17 +61,11 @@ export function TableFacturacion() {
       try {
         const params = new URLSearchParams()
         
-        if (timeRange === "7d") {
-          params.append("rango", "ultimos7d")
-          params.append("take", "1000")
-        } else if (timeRange === "30d") {
-          params.append("rango", "ultimoMes")
-          params.append("take", "3000")
-        } else if (timeRange === "mesActual") {
-          params.append("rango", "mesActual")
-          params.append("take", "3000")
-        } else {
-          params.append("take", "5000")
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          params.append("desde", desde)
+          params.append("hasta", hasta)
         }
 
         if (peaje !== "all") {
@@ -99,7 +99,7 @@ export function TableFacturacion() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, peaje])
+  }, [dateRange, peaje])
 
   const filteredData = React.useMemo(() => {
     if (!data.length) return []
@@ -122,28 +122,14 @@ export function TableFacturacion() {
             {filteredData.length} facturas - Total: ${totalFacturado.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
           </CardDescription>
         </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[150px] rounded-lg" aria-label="Rango de tiempo">
-              <SelectValue placeholder="Últimos 7 días" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-                <SelectItem value="mesActual" className="rounded-lg">
-                  Mes actual
-                </SelectItem>
-              <SelectItem value="90d" className="rounded-lg">
-                Últimos 90 días
-              </SelectItem>
-              <SelectItem value="30d" className="rounded-lg">
-                Últimos 30 días
-              </SelectItem>
-              <SelectItem value="7d" className="rounded-lg">
-                Últimos 7 días
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
           <Select value={peaje} onValueChange={setPeaje}>
-            <SelectTrigger className="w-[150px] rounded-lg" aria-label="Peaje">
+            <SelectTrigger className="h-10 w-[150px] rounded-lg text-base font-semibold" aria-label="Peaje">
               <SelectValue placeholder="Todos los peajes" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -159,7 +145,7 @@ export function TableFacturacion() {
             </SelectContent>
           </Select>
           <Select value={turno} onValueChange={setTurno}>
-            <SelectTrigger className="w-[140px] rounded-lg" aria-label="Turno">
+            <SelectTrigger className="h-10 w-[140px] rounded-lg text-base font-semibold" aria-label="Turno">
               <SelectValue placeholder="Turno" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">

@@ -1,4 +1,6 @@
 import * as React from "react"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"
 import { toPng } from "html-to-image"
 import { FileDown, TrendingUp, Calendar, Clock, Activity } from "lucide-react"
@@ -25,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Análisis Temporal Avanzado"
 
@@ -95,8 +98,15 @@ function setCachedData(key: string, aggregates: TemporalAggregates | null): void
   }
 }
 
-async function fetchTemporalAggregates(timeRange: string, peaje: string = "all"): Promise<TemporalAggregates | null> {
-  const cacheKey = getCacheKey(`${timeRange}-${peaje}`)
+function getDateRangeKey(range: DateRange | undefined): string {
+  if (!range?.from) return "sin-fecha"
+  const from = format(range.from, "yyyy-MM-dd")
+  const to = range.to ? format(range.to, "yyyy-MM-dd") : from
+  return `${from}_${to}`
+}
+
+async function fetchTemporalAggregates(dateRange: DateRange | undefined, peaje: string = "all"): Promise<TemporalAggregates | null> {
+  const cacheKey = getCacheKey(`${getDateRangeKey(dateRange)}-${peaje}`)
   const cached = getCachedData(cacheKey)
   
   if (cached) {
@@ -105,12 +115,11 @@ async function fetchTemporalAggregates(timeRange: string, peaje: string = "all")
 
   const params = new URLSearchParams()
 
-  if (timeRange === "mesActual") {
-    params.append("rango", "mesActual")
-  } else if (timeRange === "ultimoMes") {
-    params.append("rango", "ultimoMes")
-  } else if (timeRange === "ultimos90d") {
-    params.append("rango", "ultimos90d")
+  if (dateRange?.from) {
+    const desde = format(dateRange.from, "yyyy-MM-dd")
+    const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+    params.append("desde", desde)
+    params.append("hasta", hasta)
   }
 
   if (peaje !== "all") {
@@ -237,7 +246,10 @@ function HeatmapChart({ data }: { data: Record<string, Record<string, number>> }
 }
 
 export function ChartTemporal() {
-  const [timeRange, setTimeRange] = React.useState("ultimos7d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [peaje, setPeaje] = React.useState<string>("all")
   const [aggregates, setAggregates] = React.useState<TemporalAggregates | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -251,7 +263,7 @@ export function ChartTemporal() {
       setLoading(true)
       setError(null)
       try {
-        const result = await fetchTemporalAggregates(timeRange, peaje)
+        const result = await fetchTemporalAggregates(dateRange, peaje)
         if (isMounted) {
           setAggregates(result)
         }
@@ -271,7 +283,7 @@ export function ChartTemporal() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, peaje])
+  }, [dateRange, peaje])
 
   const handleExportImage = async () => {
     if (!chartRef.current) return
@@ -283,7 +295,8 @@ export function ChartTemporal() {
       })
       
       const link = document.createElement('a')
-      link.download = `analisis-temporal-${timeRange}-${Date.now()}.png`
+      const dateKey = getDateRangeKey(dateRange)
+      link.download = `analisis-temporal-${dateKey}-${Date.now()}.png`
       link.href = dataUrl
       link.click()
     } catch (err) {
@@ -383,9 +396,9 @@ export function ChartTemporal() {
           </p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Select value={peaje} onValueChange={setPeaje}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="h-10 w-[160px] text-base font-semibold">
               <SelectValue placeholder="Todos los peajes" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -401,17 +414,11 @@ export function ChartTemporal() {
             </SelectContent>
           </Select>
           
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Seleccionar período" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem value="ultimos7d" className="rounded-lg">Últimos 7 días</SelectItem>
-              <SelectItem value="mesActual" className="rounded-lg">Mes actual</SelectItem>
-              <SelectItem value="ultimoMes" className="rounded-lg">Último mes</SelectItem>
-              <SelectItem value="ultimos90d" className="rounded-lg">Últimos 90 días</SelectItem>
-            </SelectContent>
-          </Select>
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
           
           <Button variant="outline" size="icon" onClick={handleExportImage}>
             <FileDown className="h-4 w-4" />
@@ -421,7 +428,7 @@ export function ChartTemporal() {
 
       {/* KPIs principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Tránsito</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
@@ -432,7 +439,7 @@ export function ChartTemporal() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Promedio Diario</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -443,7 +450,7 @@ export function ChartTemporal() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="border-sky-200/70 bg-gradient-to-br from-sky-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Día Pico</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -454,7 +461,7 @@ export function ChartTemporal() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="border-violet-200/70 bg-gradient-to-br from-violet-50 to-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Hora Pico</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />

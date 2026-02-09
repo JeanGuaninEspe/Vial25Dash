@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { TrendingUp, TrendingDown } from "lucide-react"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 
 import {
   Card,
@@ -25,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Recaudacion por peaje"
 
@@ -82,7 +85,10 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function ChartAreaInteractive() {
-  const [timeRange, setTimeRange] = React.useState("90d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [turno, setTurno] = React.useState("all")
   const includeData = false
   const [aggregates, setAggregates] = React.useState<RecaudacionAggregates | null>(null)
@@ -96,19 +102,11 @@ export function ChartAreaInteractive() {
       try {
         const params = new URLSearchParams()
 
-        let rangoParam = ""
-        if (timeRange === "7d") {
-          rangoParam = "ultimos7dAnterior"
-          params.append("take", "1000")
-        } else if (timeRange === "30d") {
-          rangoParam = "ultimoMesAnterior"
-          params.append("take", "2000")
-        } else if (timeRange === "90d") {
-          rangoParam = "ultimos90dAnterior"
-          params.append("take", "5000")
-        } else if (timeRange === "mesActual") {
-          rangoParam = "mesActual"
-          params.append("take", "2000")
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          params.append("desde", desde)
+          params.append("hasta", hasta)
         }
 
         if (turno !== "all") {
@@ -119,7 +117,6 @@ export function ChartAreaInteractive() {
           params.append("includeData", "true")
         }
 
-        params.append("rango", rangoParam)
         const url = `${BASE_URL}${ENDPOINT}?${params.toString()}`
 
         const response = await fetch(url)
@@ -150,7 +147,7 @@ export function ChartAreaInteractive() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, turno])
+  }, [dateRange, turno])
 
   const chartData = React.useMemo<ChartRow[]>(() => {
     if (!aggregates?.totalesPorDia?.length) return []
@@ -196,39 +193,25 @@ export function ChartAreaInteractive() {
           </CardDescription>
           {totalesPeriodo && (
             <div className="flex gap-4 mt-3">
-              <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 shadow-sm min-w-[180px]">
+              <div className="flex flex-col gap-1 rounded-lg border border-amber-200/70 bg-gradient-to-br from-amber-50 to-white p-3 shadow-sm min-w-[180px]">
                 <span className="text-xs text-muted-foreground font-medium">Congoma</span>
                 <span className="text-2xl font-bold">${totalesPeriodo.congoma.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 shadow-sm min-w-[180px]">
+              <div className="flex flex-col gap-1 rounded-lg border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm min-w-[180px]">
                 <span className="text-xs text-muted-foreground font-medium">Los Angeles</span>
                 <span className="text-2xl font-bold">${totalesPeriodo.losAngeles.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[150px] rounded-lg" aria-label="Rango de tiempo">
-              <SelectValue placeholder="Ultimos 90 dias" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem value="mesActual" className="rounded-lg">
-                Mes actual
-              </SelectItem>
-              <SelectItem value="90d" className="rounded-lg">
-                Ultimos 90 dias
-              </SelectItem>
-              <SelectItem value="30d" className="rounded-lg">
-                Ultimos 30 dias
-              </SelectItem>
-              <SelectItem value="7d" className="rounded-lg">
-                Ultimos 7 dias
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
           <Select value={turno} onValueChange={setTurno}>
-            <SelectTrigger className="w-[140px] rounded-lg" aria-label="Turno">
+            <SelectTrigger className="h-10 w-[140px] rounded-lg text-base font-semibold" aria-label="Turno">
               <SelectValue placeholder="Turno" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">

@@ -1,4 +1,6 @@
 import * as React from "react"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart, Pie, PieChart, Cell, Legend } from "recharts"
 import { toPng } from "html-to-image"
 import { FileDown, TrendingUp, DollarSign, Users, Percent } from "lucide-react"
@@ -27,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Reporte Estadístico de Recaudación"
 
@@ -107,15 +110,19 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const CACHE_PREFIX = 'estadistico-cache-'
 const CACHE_EXPIRY = 30 * 60 * 1000 // 30 minutos
 
-// Helper para convertir timeRange a etiqueta legible
-function getTimeRangeLabel(timeRange: string): string {
-  switch (timeRange) {
-    case "ultimos7d": return "los últimos 7 días"
-    case "mesActual": return "el mes actual"
-    case "ultimoMes": return "el último mes"
-    case "ultimos90d": return "los últimos 90 días"
-    default: return "el período seleccionado"
-  }
+// Helper para convertir rango de fechas a etiqueta legible
+function getDateRangeLabel(range: DateRange | undefined): string {
+  if (!range?.from) return "el período seleccionado"
+  const desde = format(range.from, "dd/MM/yyyy")
+  const hasta = range.to ? format(range.to, "dd/MM/yyyy") : desde
+  return `del ${desde} al ${hasta}`
+}
+
+function getDateRangeKey(range: DateRange | undefined): string {
+  if (!range?.from) return "sin-fecha"
+  const desde = format(range.from, "yyyy-MM-dd")
+  const hasta = range.to ? format(range.to, "yyyy-MM-dd") : desde
+  return `${desde}_${hasta}`
 }
 
 function getCachedData(key: string): EstadisticoResponse | null {
@@ -154,7 +161,10 @@ function setCachedData(key: string, payload: EstadisticoResponse) {
 }
 
 export function ChartEstadistico() {
-  const [timeRange, setTimeRange] = React.useState("ultimos7d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [peaje, setPeaje] = React.useState<string>("all")
   const includeData = false
   const [data, setData] = React.useState<EstadisticoRow[]>([])
@@ -242,9 +252,7 @@ export function ChartEstadistico() {
         body: JSON.stringify({
           charts,
           peaje: peaje === "all" ? "Congoma y Los Angeles" : peaje === "1" ? "Congoma" : "Los Angeles",
-          timeRange: timeRange === "ultimos7d" ? "Últimos 7 días" :
-                     timeRange === "mesActual" ? "Mes actual" :
-                     timeRange === "ultimoMes" ? "Último mes" : "Últimos 90 días",
+          timeRange: getDateRangeLabel(dateRange),
           kpis: {
             ingresoTotal: kpis.ingresoTotal,
             vehiculosEfec: kpis.vehiculosEfec,
@@ -282,20 +290,12 @@ export function ChartEstadistico() {
       setLoading(true)
       try {
         const params = new URLSearchParams()
-        
-        // Mapear timeRange a parámetro del API
-        if (timeRange === "ultimos7d") {
-          // Default - no enviar parámetro
-          params.append("take", peaje === "all" ? "10000" : "10000")
-        } else if (timeRange === "mesActual") {
-          params.append("rango", "mesActual")
-          params.append("take", peaje === "all" ? "30000" : "30000")
-        } else if (timeRange === "ultimoMes") {
-          params.append("rango", "ultimoMes")
-          params.append("take", peaje === "all" ? "30000" : "35000")
-        } else if (timeRange === "ultimos90d") {
-          params.append("rango", "ultimos90d")
-          params.append("take", peaje === "all" ? "30000" : "30000")
+
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          params.append("desde", desde)
+          params.append("hasta", hasta)
         }
 
         // Filtro de peaje
@@ -308,7 +308,7 @@ export function ChartEstadistico() {
         }
 
         // Clave de caché
-        const cacheKey = `${timeRange}-${peaje}`
+        const cacheKey = `${getDateRangeKey(dateRange)}-${peaje}`
         
         // Verificar caché en sessionStorage
         const cachedData = getCachedData(cacheKey)
@@ -355,7 +355,7 @@ export function ChartEstadistico() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, peaje])
+  }, [dateRange, peaje])
 
   // KPIs
   const computedKpis = React.useMemo(() => {
@@ -687,7 +687,7 @@ export function ChartEstadistico() {
             {generatingPdf ? "Generando..." : "Generar PDF"}
           </Button>
           <Select value={peaje} onValueChange={setPeaje}>
-            <SelectTrigger className="w-[160px] rounded-lg" aria-label="Peaje">
+            <SelectTrigger className="h-10 w-[160px] rounded-lg text-base font-semibold" aria-label="Peaje">
               <SelectValue placeholder="Todos los peajes" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -702,31 +702,17 @@ export function ChartEstadistico() {
               </SelectItem>
             </SelectContent>
           </Select>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[160px] rounded-lg" aria-label="Rango de tiempo">
-              <SelectValue placeholder="Últimos 7 días" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem value="ultimos7d" className="rounded-lg">
-                Últimos 7 días
-              </SelectItem>
-              <SelectItem value="mesActual" className="rounded-lg">
-                Mes actual
-              </SelectItem>
-              <SelectItem value="ultimoMes" className="rounded-lg">
-                Último mes
-              </SelectItem>
-              <SelectItem value="ultimos90d" className="rounded-lg">
-                Últimos 90 días
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
         </div>
       </div>
 
       {/* Fila 1: KPIs */}
       <div ref={kpisRef} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Ingreso Total</CardDescription>
           </CardHeader>
@@ -737,7 +723,7 @@ export function ChartEstadistico() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-sky-200/70 bg-gradient-to-br from-sky-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Vehículos EFEC</CardDescription>
           </CardHeader>
@@ -748,7 +734,7 @@ export function ChartEstadistico() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Vehículos Exentos</CardDescription>
           </CardHeader>
@@ -759,7 +745,7 @@ export function ChartEstadistico() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-violet-200/70 bg-gradient-to-br from-violet-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>% Exentos</CardDescription>
           </CardHeader>
@@ -844,7 +830,7 @@ export function ChartEstadistico() {
                   <div className="grid gap-2">
                     <div className="flex items-center gap-2 font-medium leading-none">
                       <DollarSign className="h-4 w-4" />
-                      La categoría con mayor ingreso fue {maxCategoria.categoria} con ${maxCategoria.valor.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getTimeRangeLabel(timeRange)}
+                      La categoría con mayor ingreso fue {maxCategoria.categoria} con ${maxCategoria.valor.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getDateRangeLabel(dateRange)}
                     </div>
                   </div>
                 </div>
@@ -861,7 +847,7 @@ export function ChartEstadistico() {
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 font-medium leading-none">
                     <DollarSign className="h-4 w-4" />
-                    La categoría con mayor ingreso fue {maxCategoria.categoria} con ${totalMax.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getTimeRangeLabel(timeRange)}
+                    La categoría con mayor ingreso fue {maxCategoria.categoria} con ${totalMax.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getDateRangeLabel(dateRange)}
                   </div>
                 </div>
               </div>
@@ -1027,7 +1013,7 @@ export function ChartEstadistico() {
                   <div className="grid gap-2">
                     <div className="flex items-center gap-2 font-medium leading-none">
                       <Percent className="h-4 w-4" />
-                      Los pagos en efectivo representan el {efecPercent}% del total en {getTimeRangeLabel(timeRange)}
+                      Los pagos en efectivo representan el {efecPercent}% del total en {getDateRangeLabel(dateRange)}
                     </div>
                   </div>
                 </div>

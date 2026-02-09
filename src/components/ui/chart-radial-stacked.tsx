@@ -1,6 +1,8 @@
 import * as React from "react"
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 
 import {
   Card,
@@ -16,13 +18,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Ventas de TAG por peaje"
 
@@ -79,7 +75,10 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function ChartRadialStacked() {
-  const [timeRange, setTimeRange] = React.useState("30d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const includeData = false
   const [aggregates, setAggregates] = React.useState<VentaTagAggregates | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -92,26 +91,17 @@ export function ChartRadialStacked() {
       try {
         const params = new URLSearchParams()
         
-        let rangoParam = ""
-        if (timeRange === "7d") {
-          rangoParam = "ultimos7dAnterior"
-          params.append("take", "1000")
-        } else if (timeRange === "30d") {
-          rangoParam = "ultimoMesAnterior"
-          params.append("take", "5000")
-        } else if (timeRange === "90d") {
-          rangoParam = "ultimos90dAnterior"
-          params.append("take", "10000")
-        } else if (timeRange === "mesActual") {
-          rangoParam = "mesActual"
-          params.append("take", "5000")
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          params.append("desde", desde)
+          params.append("hasta", hasta)
         }
 
         if (includeData) {
           params.append("includeData", "true")
         }
 
-        params.append("rango", rangoParam)
         const url = `${BASE_URL}${ENDPOINT}?${params.toString()}`
         const response = await fetch(url)
         
@@ -140,7 +130,7 @@ export function ChartRadialStacked() {
     return () => {
       isMounted = false
     }
-  }, [timeRange])
+  }, [dateRange])
 
   const chartData = React.useMemo(() => {
     if (!aggregates) return null
@@ -160,25 +150,11 @@ export function ChartRadialStacked() {
       <CardHeader className="items-center pb-0">
         <CardTitle>Ventas de TAG</CardTitle>
         <CardDescription>Distribución por peaje</CardDescription>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-[150px] rounded-lg mt-2" aria-label="Rango de tiempo">
-            <SelectValue placeholder="Últimos 30 días" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="mesActual" className="rounded-lg">
-              Mes actual
-            </SelectItem>
-            <SelectItem value="90d" className="rounded-lg">
-              Últimos 90 días
-            </SelectItem>
-            <SelectItem value="30d" className="rounded-lg">
-              Últimos 30 días
-            </SelectItem>
-            <SelectItem value="7d" className="rounded-lg">
-              Últimos 7 días
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <DatePickerWithRange
+          value={dateRange}
+          onChange={setDateRange}
+          className="w-[240px] mt-2"
+        />
       </CardHeader>
       <CardContent className="flex flex-1 items-center pb-0">
         {loading && <p className="text-sm text-muted-foreground">Cargando ventas...</p>}

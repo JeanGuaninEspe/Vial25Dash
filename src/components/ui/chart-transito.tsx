@@ -1,5 +1,7 @@
 import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 
 import {
   Card,
@@ -23,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Transito vehicular por peaje"
 
@@ -58,7 +61,10 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function ChartTransito() {
-  const [timeRange, setTimeRange] = React.useState("90d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [turno, setTurno] = React.useState("all")
   const [data, setData] = React.useState<ChartRow[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -69,20 +75,14 @@ export function ChartTransito() {
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Construir parámetros base según timeRange
+        // Construir parámetros base según rango de fechas
         const baseParams = new URLSearchParams()
-        
-        if (timeRange === "7d") {
-          baseParams.append("rango", "ultimos7d")
-          baseParams.append("take", "50000")
-        } else if (timeRange === "30d") {
-          baseParams.append("rango", "ultimoMes")
-          baseParams.append("take", "50000")
-        } else if (timeRange === "mesActual") {
-          baseParams.append("rango", "mesActual")
-          baseParams.append("take", "50000")
-        } else {
-          baseParams.append("take", "50000")
+
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          baseParams.append("desde", desde)
+          baseParams.append("hasta", hasta)
         }
 
         if (turno !== "all") {
@@ -157,7 +157,7 @@ export function ChartTransito() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, turno])
+  }, [dateRange, turno])
 
   const hasNoData = !loading && !data.length
 
@@ -170,28 +170,14 @@ export function ChartTransito() {
             Cantidad de vehículos por día (Congoma vs Los Angeles)
           </CardDescription>
         </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[150px] rounded-lg" aria-label="Rango de tiempo">
-              <SelectValue placeholder="Ultimos 90 dias" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-                <SelectItem value="mesActual" className="rounded-lg">
-                  Mes actual
-                </SelectItem>
-              <SelectItem value="90d" className="rounded-lg">
-                Ultimos 90 dias
-              </SelectItem>
-              <SelectItem value="30d" className="rounded-lg">
-                Ultimos 30 dias
-              </SelectItem>
-              <SelectItem value="7d" className="rounded-lg">
-                Ultimos 7 dias
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
           <Select value={turno} onValueChange={setTurno}>
-            <SelectTrigger className="w-[140px] rounded-lg" aria-label="Turno">
+            <SelectTrigger className="h-10 w-[140px] rounded-lg text-base font-semibold" aria-label="Turno">
               <SelectValue placeholder="Turno" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">

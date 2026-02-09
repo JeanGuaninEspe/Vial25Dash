@@ -1,4 +1,6 @@
 import * as React from "react"
+import { addDays, format } from "date-fns"
+import { type DateRange } from "react-day-picker"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart, Cell, PieChart, Pie, Legend } from "recharts"
 import { toPng } from "html-to-image"
 import { FileDown, TrendingUp, DollarSign, Users, Percent } from "lucide-react"
@@ -25,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { DatePickerWithRange } from "@/components/ui/range_picker"
 
 export const description = "Análisis de Tráfico por Cabinas"
 
@@ -60,14 +63,18 @@ const COLORS = [
   "#06b6d4", "#ef4444", "#84cc16", "#a855f7", "#f97316"
 ]
 
-const getTimeRangeLabel = (timeRange: string) => {
-  switch (timeRange) {
-    case "ultimos7d": return "los últimos 7 días"
-    case "mesActual": return "el mes actual"
-    case "ultimoMes": return "el último mes"
-    case "ultimos90d": return "los últimos 90 días"
-    default: return "el período seleccionado"
-  }
+const getDateRangeLabel = (range: DateRange | undefined) => {
+  if (!range?.from) return "el período seleccionado"
+  const desde = format(range.from, "dd/MM/yyyy")
+  const hasta = range.to ? format(range.to, "dd/MM/yyyy") : desde
+  return `del ${desde} al ${hasta}`
+}
+
+const getDateRangeKey = (range: DateRange | undefined) => {
+  if (!range?.from) return "sin-fecha"
+  const desde = format(range.from, "yyyy-MM-dd")
+  const hasta = range.to ? format(range.to, "yyyy-MM-dd") : desde
+  return `${desde}_${hasta}`
 }
 
 // Funciones de caché
@@ -105,7 +112,10 @@ function setCachedData(key: string, aggregates: CabinasAggregates | null) {
 }
 
 export function ChartCabinas() {
-  const [timeRange, setTimeRange] = React.useState("ultimos7d")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  })
   const [peaje, setPeaje] = React.useState<string>("all")
   const [aggregates, setAggregates] = React.useState<CabinasAggregates | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -172,9 +182,7 @@ export function ChartCabinas() {
         body: JSON.stringify({
           charts,
           peaje: peaje === "all" ? "Congoma y Los Angeles" : peaje === "1" ? "Congoma" : "Los Angeles",
-          timeRange: timeRange === "ultimos7d" ? "Últimos 7 días" :
-                     timeRange === "mesActual" ? "Mes actual" :
-                     timeRange === "ultimoMes" ? "Último mes" : "Últimos 90 días",
+          timeRange: getDateRangeLabel(dateRange),
           reportType: "Cabinas"
         })
       })
@@ -204,25 +212,19 @@ export function ChartCabinas() {
       setLoading(true)
       try {
         const params = new URLSearchParams()
-        
-        if (timeRange === "ultimos7d") {
-          params.append("take", peaje === "all" ? "10000" : "10000")
-        } else if (timeRange === "mesActual") {
-          params.append("rango", "mesActual")
-          params.append("take", peaje === "all" ? "30000" : "30000")
-        } else if (timeRange === "ultimoMes") {
-          params.append("rango", "ultimoMes")
-          params.append("take", peaje === "all" ? "30000" : "35000")
-        } else if (timeRange === "ultimos90d") {
-          params.append("rango", "ultimos90d")
-          params.append("take", peaje === "all" ? "30000" : "30000")
+
+        if (dateRange?.from) {
+          const desde = format(dateRange.from, "yyyy-MM-dd")
+          const hasta = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : desde
+          params.append("desde", desde)
+          params.append("hasta", hasta)
         }
 
         if (peaje !== "all") {
           params.append("idPeaje", peaje)
         }
 
-        const cacheKey = `${timeRange}-${peaje}`
+        const cacheKey = `${getDateRangeKey(dateRange)}-${peaje}`
         const cachedData = getCachedData(cacheKey)
         if (cachedData) {
           if (isMounted) {
@@ -261,7 +263,7 @@ export function ChartCabinas() {
     return () => {
       isMounted = false
     }
-  }, [timeRange, peaje])
+  }, [dateRange, peaje])
 
   const kpisCabinas = React.useMemo(() => {
     if (!aggregates) {
@@ -435,7 +437,7 @@ export function ChartCabinas() {
             {generatingPdf ? "Generando..." : "Generar PDF"}
           </Button>
           <Select value={peaje} onValueChange={setPeaje}>
-            <SelectTrigger className="w-[160px] rounded-lg" aria-label="Peaje">
+            <SelectTrigger className="h-10 w-[160px] rounded-lg text-base font-semibold" aria-label="Peaje">
               <SelectValue placeholder="Todos los peajes" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -444,23 +446,17 @@ export function ChartCabinas() {
               <SelectItem value="2" className="rounded-lg">Los Angeles</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[160px] rounded-lg" aria-label="Rango de tiempo">
-              <SelectValue placeholder="Últimos 7 días" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem value="ultimos7d" className="rounded-lg">Últimos 7 días</SelectItem>
-              <SelectItem value="mesActual" className="rounded-lg">Mes actual</SelectItem>
-              <SelectItem value="ultimoMes" className="rounded-lg">Último mes</SelectItem>
-              <SelectItem value="ultimos90d" className="rounded-lg">Últimos 90 días</SelectItem>
-            </SelectContent>
-          </Select>
+          <DatePickerWithRange
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[240px]"
+          />
         </div>
       </div>
 
       {/* KPIs */}
       <div ref={kpisRef} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
+        <Card className="border-sky-200/70 bg-gradient-to-br from-sky-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Total Cabinas</CardDescription>
           </CardHeader>
@@ -469,7 +465,7 @@ export function ChartCabinas() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-amber-200/70 bg-gradient-to-br from-amber-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Total Vehículos</CardDescription>
           </CardHeader>
@@ -480,7 +476,7 @@ export function ChartCabinas() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Ingreso Total</CardDescription>
           </CardHeader>
@@ -491,7 +487,7 @@ export function ChartCabinas() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-violet-200/70 bg-gradient-to-br from-violet-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Promedio Vehículos</CardDescription>
           </CardHeader>
@@ -503,7 +499,7 @@ export function ChartCabinas() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-rose-200/70 bg-gradient-to-br from-rose-50 to-white">
           <CardHeader className="pb-2">
             <CardDescription>Promedio Ingreso</CardDescription>
           </CardHeader>
@@ -563,7 +559,7 @@ export function ChartCabinas() {
             <CardFooter className="flex-col items-start gap-2 text-sm">
               <div className="flex gap-2 font-medium leading-none">
                 <TrendingUp className="h-4 w-4" />
-                La {traficoPorCabina[0].cabina} tuvo el mayor tráfico con {traficoPorCabina[0].vehiculos.toLocaleString()} vehículos en {getTimeRangeLabel(timeRange)}
+                La {traficoPorCabina[0].cabina} tuvo el mayor tráfico con {traficoPorCabina[0].vehiculos.toLocaleString()} vehículos en {getDateRangeLabel(dateRange)}
               </div>
             </CardFooter>
           )}
@@ -614,7 +610,7 @@ export function ChartCabinas() {
             <CardFooter className="flex-col items-start gap-2 text-sm">
               <div className="flex gap-2 font-medium leading-none">
                 <DollarSign className="h-4 w-4" />
-                La {traficoPorCabina[0].cabina} generó los mayores ingresos con ${traficoPorCabina[0].ingreso.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getTimeRangeLabel(timeRange)}
+                La {traficoPorCabina[0].cabina} generó los mayores ingresos con ${traficoPorCabina[0].ingreso.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} en {getDateRangeLabel(dateRange)}
               </div>
             </CardFooter>
           )}
@@ -706,7 +702,7 @@ export function ChartCabinas() {
             <CardFooter className="flex-col items-start gap-2 text-sm">
               <div className="flex gap-2 font-medium leading-none">
                 <Percent className="h-4 w-4" />
-                {distribucionPorcentual[0].name} concentra el {distribucionPorcentual[0].porcentaje}% del tráfico total en {getTimeRangeLabel(timeRange)}
+                {distribucionPorcentual[0].name} concentra el {distribucionPorcentual[0].porcentaje}% del tráfico total en {getDateRangeLabel(dateRange)}
               </div>
             </CardFooter>
           )}
@@ -766,7 +762,7 @@ export function ChartCabinas() {
               <CardFooter className="flex-col items-start gap-2 text-sm">
                 <div className="flex gap-2 font-medium leading-none">
                   <TrendingUp className="h-4 w-4" />
-                  El RFID representa el {porcentajeRfid.toFixed(1)}% del total de transacciones en {getTimeRangeLabel(timeRange)}
+                  El RFID representa el {porcentajeRfid.toFixed(1)}% del total de transacciones en {getDateRangeLabel(dateRange)}
                 </div>
               </CardFooter>
             )
