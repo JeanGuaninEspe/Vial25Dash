@@ -80,6 +80,12 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
             children
           )}
         </main>
+        <footer className="border-t bg-white/60 px-4 py-4 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <span>Desarrollado: Febrero 2026 · Jean Guanin</span>
+            <span>© 2026 Sistema Integral de Peajes. Todos los derechos reservados.</span>
+          </div>
+        </footer>
         <Toaster position="top-center" />
       </SidebarInset>
     </SidebarProvider>
