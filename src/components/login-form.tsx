@@ -49,9 +49,9 @@ export function LoginForm() {
         throw new Error("No se pudo iniciar sesion. Intenta nuevamente.")
       }
 
-      const me = await apiFetch("/auth/me")
-      if (!me.ok) {
-        throw new Error("No se pudo validar la sesion. Revisa cookies/CORS.")
+      const payload = (await response.json()) as { access_token?: string }
+      if (payload?.access_token) {
+        document.cookie = `access_token=${payload.access_token}; path=/; max-age=3600`
       }
 
       setSuccess(true)
