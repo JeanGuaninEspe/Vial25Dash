@@ -1,6 +1,10 @@
 import * as React from "react"
+import { LogOut } from "lucide-react"
 import { AppSidebar } from "./app-sidebar"
+import { Button } from "./ui/button"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "./ui/sidebar"
+import { Toaster } from "./ui/sonner"
+import { apiFetch } from "@/lib/api"
 
 type SidebarLayoutProps = {
   title: string
@@ -9,6 +13,39 @@ type SidebarLayoutProps = {
 }
 
 export function SidebarLayout({ title, description, children }: SidebarLayoutProps) {
+  const [validating, setValidating] = React.useState(true)
+
+  React.useEffect(() => {
+    const ensureSession = async () => {
+      try {
+        const me = await apiFetch("/auth/me")
+
+        if (me.ok) {
+          setValidating(false)
+          return
+        }
+      } catch {
+        // Ignorar para manejar el redirect abajo.
+      }
+
+      setValidating(false)
+      window.location.href = "/login"
+    }
+
+    ensureSession()
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch("/auth/logout", {
+        method: "POST",
+        skipAuthRefresh: true,
+      })
+    } finally {
+      window.location.href = "/login"
+    }
+  }
+
   return (
     <SidebarProvider defaultOpen={false}>
       <AppSidebar />
@@ -24,10 +61,26 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
             <p className="text-base text-muted-foreground">{description}</p>
           </div>
+          <div className="ml-auto">
+            <Button variant="outline" className="gap-2" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              Cerrar sesion
+            </Button>
+          </div>
         </header>
         <main className="flex flex-1 flex-col gap-8 p-4 md:p-6">
-          {children}
+          {validating ? (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
+                Validando sesion...
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </main>
+        <Toaster position="top-center" />
       </SidebarInset>
     </SidebarProvider>
   )

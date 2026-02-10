@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { DatePickerWithRange } from "@/components/ui/range_picker"
+import { apiFetch } from "@/lib/api"
 
 export const description = "Análisis Temporal Avanzado"
 
@@ -127,7 +128,7 @@ async function fetchTemporalAggregates(dateRange: DateRange | undefined, peaje: 
   }
 
   const url = `${BASE_URL}${ENDPOINT}?${params.toString()}`
-  const response = await fetch(url)
+  const response = await apiFetch(url)
   
   if (!response.ok) {
     throw new Error(`Error al cargar datos: ${response.statusText}`)

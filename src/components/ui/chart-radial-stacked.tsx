@@ -19,6 +19,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { DatePickerWithRange } from "@/components/ui/range_picker"
+import { apiFetch } from "@/lib/api"
 
 export const description = "Ventas de TAG por peaje"
 
@@ -103,7 +104,7 @@ export function ChartRadialStacked() {
         }
 
         const url = `${BASE_URL}${ENDPOINT}?${params.toString()}`
-        const response = await fetch(url)
+        const response = await apiFetch(url)
         
         if (!response.ok) {
           throw new Error(`Error ${response.status}`)

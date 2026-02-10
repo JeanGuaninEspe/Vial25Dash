@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/ui/range_picker"
+import { apiFetch } from "@/lib/api"
 
 export const description = "Transito vehicular por peaje"
 
@@ -100,8 +101,8 @@ export function ChartTransito() {
         const urlLosAngeles = `${BASE_URL}${ENDPOINT}?${paramsLosAngeles.toString()}`
         
         const [responseConoma, responseLosAngeles] = await Promise.all([
-          fetch(urlConoma),
-          fetch(urlLosAngeles)
+          apiFetch(urlConoma),
+          apiFetch(urlLosAngeles)
         ])
         
         if (!responseConoma.ok || !responseLosAngeles.ok) {

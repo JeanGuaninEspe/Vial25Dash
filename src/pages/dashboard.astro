@@ -4,6 +4,7 @@ import { ChartAreaInteractive } from '../components/ui/chart-area-interactive';
 import { ChartTransito } from '../components/ui/chart-transito';
 import { ChartRadialStacked } from '../components/ui/chart-radial-stacked';
 import { SidebarLayout } from '../components/sidebar-layout';
+import { DashboardWelcome } from '../components/dashboard-welcome';
 ---
 
 <!doctype html>
@@ -22,6 +23,7 @@ import { SidebarLayout } from '../components/sidebar-layout';
 			title="Dashboard de Peajes"
 			description="Sistema de monitoreo y análisis"
 		>
+			<DashboardWelcome client:load />
 			<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 				<div class="md:col-span-2 lg:col-span-2">
 					<ChartAreaInteractive client:load />

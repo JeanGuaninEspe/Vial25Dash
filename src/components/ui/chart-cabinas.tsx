@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { DatePickerWithRange } from "@/components/ui/range_picker"
+import { apiFetch } from "@/lib/api"
 
 export const description = "Análisis de Tráfico por Cabinas"
 
@@ -176,7 +177,7 @@ export function ChartCabinas() {
       }
 
       // Enviar al backend
-      const response = await fetch(`${BASE_URL}/r-estadistico/pdf`, {
+      const response = await apiFetch(`${BASE_URL}/r-estadistico/pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -236,7 +237,7 @@ export function ChartCabinas() {
         }
 
         const url = `${BASE_URL}${ENDPOINT}?${params.toString()}`
-        const response = await fetch(url)
+        const response = await apiFetch(url)
         
         if (!response.ok) throw new Error(`Error ${response.status}`)
         
