@@ -49,10 +49,15 @@ export function LoginForm() {
         throw new Error("No se pudo iniciar sesion. Intenta nuevamente.")
       }
 
+      const me = await apiFetch("/auth/me")
+      if (!me.ok) {
+        throw new Error("No se pudo validar la sesion. Revisa cookies/CORS.")
+      }
+
       setSuccess(true)
       setTimeout(() => {
         window.location.href = "/dashboard"
-      }, 700)
+      }, 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesion")
     } finally {
