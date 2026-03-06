@@ -35,11 +35,6 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
         // Ignorar para manejar el redirect abajo.
       }
 
-      if (document.cookie.includes("access_token=")) {
-        setValidating(false)
-        return
-      }
-
       if (hasStoredToken()) {
         setValidating(false)
         return
