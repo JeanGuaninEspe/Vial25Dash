@@ -1,0 +1,26 @@
+---
+import '../../styles/global.css';
+import { SidebarLayout } from '../../components/sidebar-layout';
+import { RecaudacionAnualExperimental } from '../../components/ui/recaudacion-anual-experimental';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Recaudación Anual (Experimental) - Sistema Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout
+			client:load
+			title="Recaudación Anual (Experimental)"
+			description="Reporte anual por meses y semanas"
+		>
+			<RecaudacionAnualExperimental client:load />
+		</SidebarLayout>
+	</body>
+</html>

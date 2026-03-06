@@ -1,0 +1,26 @@
+---
+import '../../styles/global.css';
+import { SidebarLayout } from '../../components/sidebar-layout';
+import { TpdaExperimentalReport } from '../../components/ui/tpda-experimental-report';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Reporte TPDA (Experimental) - Sistema Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout
+			client:load
+			title="Reporte TPDA (Experimental)"
+			description="Vista comparativa diaria Cóngoma vs Los Angeles"
+		>
+			<TpdaExperimentalReport client:load />
+		</SidebarLayout>
+	</body>
+</html>

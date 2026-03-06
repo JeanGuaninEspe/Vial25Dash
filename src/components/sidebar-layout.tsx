@@ -15,6 +15,13 @@ type SidebarLayoutProps = {
 export function SidebarLayout({ title, description, children }: SidebarLayoutProps) {
   const [validating, setValidating] = React.useState(true)
 
+  const hasStoredToken = React.useCallback(() => {
+    if (typeof window === "undefined") return false
+    return Boolean(
+      sessionStorage.getItem("access_token") || localStorage.getItem("access_token")
+    )
+  }, [])
+
   React.useEffect(() => {
     const ensureSession = async () => {
       try {
@@ -33,12 +40,17 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
         return
       }
 
+      if (hasStoredToken()) {
+        setValidating(false)
+        return
+      }
+
       setValidating(false)
       window.location.href = "/login"
     }
 
     ensureSession()
-  }, [])
+  }, [hasStoredToken])
 
   const handleLogout = async () => {
     try {
@@ -47,6 +59,8 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
         skipAuthRefresh: true,
       })
     } finally {
+      sessionStorage.removeItem("access_token")
+      localStorage.removeItem("access_token")
       window.location.href = "/login"
     }
   }

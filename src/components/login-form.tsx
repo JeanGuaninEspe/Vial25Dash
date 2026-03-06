@@ -51,7 +51,11 @@ export function LoginForm() {
 
       const payload = (await response.json()) as { access_token?: string }
       if (payload?.access_token) {
-        document.cookie = `access_token=${payload.access_token}; path=/; max-age=3600`
+        sessionStorage.setItem("access_token", payload.access_token)
+        localStorage.setItem("access_token", payload.access_token)
+      } else {
+        sessionStorage.removeItem("access_token")
+        localStorage.removeItem("access_token")
       }
 
       setSuccess(true)

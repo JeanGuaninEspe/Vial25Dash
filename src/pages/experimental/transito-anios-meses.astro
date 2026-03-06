@@ -1,0 +1,26 @@
+---
+import '../../styles/global.css';
+import { SidebarLayout } from '../../components/sidebar-layout';
+import { TransitoAniosMesesExperimental } from '../../components/ui/transito-anios-meses-experimental';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Tránsito por Años y Meses (Experimental) - Sistema Peajes</title>
+	</head>
+
+	<body class="bg-background text-foreground antialiased">
+		<SidebarLayout
+			client:load
+			title="Tránsito por Años y Meses (Experimental)"
+			description="Reporte comparativo por mes y año"
+		>
+			<TransitoAniosMesesExperimental client:load />
+		</SidebarLayout>
+	</body>
+</html>
