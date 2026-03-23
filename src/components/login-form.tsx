@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { normalizeRole } from "@/lib/roles"
 
+const V2_BASE_URL = import.meta.env.PUBLIC_V2_API_BASE_URL || ""
+
 export function LoginForm() {
   const [loading, setLoading] = React.useState(false)
   const [showPassword, setShowPassword] = React.useState(false)
@@ -31,7 +33,11 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const response = await fetch("/auth/login", {
+      if (!V2_BASE_URL) {
+        throw new Error("PUBLIC_V2_API_BASE_URL no esta configurado.")
+      }
+
+      const response = await fetch(`${V2_BASE_URL}/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: {

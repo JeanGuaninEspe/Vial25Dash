@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { apiFetch } from "@/lib/api"
 import {
   Select,
   SelectContent,
@@ -93,11 +94,6 @@ const initialNewUserForm: NewUserForm = {
   fullName: "",
   email: "",
   password: "",
-}
-
-function getToken() {
-  if (typeof window === "undefined") return ""
-  return sessionStorage.getItem("access_token") || localStorage.getItem("access_token") || ""
 }
 
 function display(v: string | null | undefined) {
@@ -173,13 +169,11 @@ export function AdminPanel() {
     setLoading(true)
     setFetchError(null)
     try {
-      const token = getToken()
-      const res = await fetch("/api/v2/users", {
+      const res = await apiFetch("/api/v2/users", {
         method: "GET",
         credentials: "include",
         headers: {
           Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       })
       if (!res.ok) {
@@ -254,14 +248,12 @@ export function AdminPanel() {
   }
 
   async function patchUser(id: string, payload: Record<string, unknown>) {
-    const token = getToken()
-    const res = await fetch(`/api/v2/users/${id}`, {
+    const res = await apiFetch(`/api/v2/users/${id}`, {
       method: "PATCH",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(payload),
     })
@@ -279,14 +271,12 @@ export function AdminPanel() {
   }
 
   async function changeRole(id: string, role: UserRole) {
-    const token = getToken()
-    const res = await fetch(`/api/v2/users/${id}/role`, {
+    const res = await apiFetch(`/api/v2/users/${id}/role`, {
       method: "PATCH",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ role }),
     })
@@ -373,14 +363,12 @@ export function AdminPanel() {
 
     setCreatingUser(true)
     try {
-      const token = getToken()
-      const res = await fetch("/api/v2/users", {
+      const res = await apiFetch("/api/v2/users", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           fullName,

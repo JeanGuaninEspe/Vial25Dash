@@ -3,15 +3,28 @@ type ApiFetchOptions = RequestInit & {
 }
 
 const baseUrl = import.meta.env.PUBLIC_BASE_URL || ""
+const v2BaseUrl = import.meta.env.PUBLIC_V2_API_BASE_URL || ""
+
+function trimSlash(value: string) {
+  return value.endsWith("/") ? value.slice(0, -1) : value
+}
 
 function buildUrl(pathOrUrl: string) {
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
     return pathOrUrl
   }
-  // No usar PUBLIC_BASE_URL para las peticiones que van al proxy local de Astro de V2
-  if (pathOrUrl.startsWith("/api/v2")) {
-    return pathOrUrl
+
+  // Convertir rutas locales del proyecto a endpoints directos V2.
+  if (pathOrUrl.startsWith("/auth/")) {
+    return `${trimSlash(v2BaseUrl)}${pathOrUrl}`
   }
+
+  // Convertir /api/v2/* a PUBLIC_V2_API_BASE_URL/*
+  if (pathOrUrl.startsWith("/api/v2")) {
+    const v2Path = pathOrUrl.replace(/^\/api\/v2/, "")
+    return `${trimSlash(v2BaseUrl)}${v2Path || ""}`
+  }
+
   return `${baseUrl}${pathOrUrl}`
 }
 
@@ -66,5 +79,6 @@ export async function apiFetch(pathOrUrl: string, options: ApiFetchOptions = {})
   return fetch(url, {
     credentials: "include",
     ...options,
+    headers,
   })
 }
