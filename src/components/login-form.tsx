@@ -68,10 +68,13 @@ export function LoginForm() {
         access_token?: string
         user?: {
           role?: string
+          fullName?: string
+          username?: string
         }
       }
       const accessToken = payload?.accessToken || payload?.access_token
       const userRole = normalizeRole(payload?.user?.role)
+      const userFullName = payload?.user?.fullName || payload?.user?.username || ""
 
       if (import.meta.env.DEV) {
         console.info("[login] V2 debug", {
@@ -90,11 +93,17 @@ export function LoginForm() {
           localStorage.setItem("user_role", userRole)
           document.cookie = `user_role=${encodeURIComponent(userRole)}; Path=/; SameSite=Lax`
         }
+        if (userFullName) {
+          sessionStorage.setItem("user_full_name", userFullName)
+          localStorage.setItem("user_full_name", userFullName)
+        }
       } else {
         sessionStorage.removeItem("access_token")
         localStorage.removeItem("access_token")
         sessionStorage.removeItem("user_role")
         localStorage.removeItem("user_role")
+        sessionStorage.removeItem("user_full_name")
+        localStorage.removeItem("user_full_name")
         document.cookie = "user_role=; Path=/; Max-Age=0; SameSite=Lax"
       }
 
@@ -110,6 +119,8 @@ export function LoginForm() {
       localStorage.removeItem("access_token")
       sessionStorage.removeItem("user_role")
       localStorage.removeItem("user_role")
+      sessionStorage.removeItem("user_full_name")
+      localStorage.removeItem("user_full_name")
       document.cookie = "user_role=; Path=/; Max-Age=0; SameSite=Lax"
       
       toast.error("Acceso denegado", {
