@@ -19,6 +19,7 @@ import {
   Info,
 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts"
+import { io } from "socket.io-client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -336,6 +337,80 @@ export function OverviewDashboard() {
     fetchDashboardData()
   }, [fetchDashboardData])
 
+  // Websocket Live Data for Transito Hoy
+  React.useEffect(() => {
+    let baseUrl = import.meta.env.PUBLIC_BASE_URL || ""
+    let socketUrl = ""
+    try {
+      const urlObj = new URL(baseUrl)
+      socketUrl = urlObj.origin + "/r-estadistico-live"
+    } catch {
+      socketUrl = "https://api.vial25.dpdns.org/r-estadistico-live"
+    }
+
+    const socket = io(socketUrl, {
+      reconnectionDelayMax: 10000,
+    })
+
+    // Mantenemos un estado local para ir sumando ambos peajes si el backend envía por separado
+    const liveCounts = { congoma: 0, losAngeles: 0 }
+
+    socket.on("connect", () => {
+      console.log("[Websocket] Conectado a transito-hoy live")
+      // Emitimos dos suscripciones para recibir la data de ambos peajes
+      socket.emit("subscribe-transito-hoy", { nombrePeaje: "CONGOMA" })
+      socket.emit("subscribe-transito-hoy", { nombrePeaje: "LOS ANGELES" })
+    })
+
+    socket.on("transito-hoy-update", (data: any) => {
+      // Data expected structure: 
+      // { fecha: "2026-03-23", idPeaje: 1, nombrePeaje: "CONGOMA", totalTransitos: 8437, ... }
+
+      if (data && typeof data === "object") {
+        const peaje = data.nombrePeaje?.toUpperCase()
+        const conteo = data.totalTransitos || data.total || data.cantidad || 0
+
+        if (peaje === "CONGOMA") liveCounts.congoma = conteo
+        else if (peaje === "LOS ANGELES") liveCounts.losAngeles = conteo
+        else if (!peaje) {
+          // Fallback por si manda el total sin nombre de peaje
+          liveCounts.congoma = conteo
+          liveCounts.losAngeles = 0
+        }
+        
+        const newTotal = liveCounts.congoma + liveCounts.losAngeles
+
+        if (newTotal > 0) {
+          setMetrics(prev => {
+            // Si prev.transitoHoy ya es el mismo, no disparamos un re-render
+            if (prev.transitoHoy === newTotal) return prev;
+            
+            const transitoVar = prev.vehiculosAyer > 0 ? ((newTotal - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
+            const tpdaEstimado = Math.floor(newTotal * 1.15)
+            
+            return {
+              ...prev,
+              transitoHoy: newTotal,
+              transitoVar,
+              tpdaEstimado,
+              tpdaVar: transitoVar,
+            }
+          })
+          setLastUpdate(new Date(data.actualizadoEn || new Date()))
+        }
+      }
+    })
+
+    socket.on("disconnect", () => {
+      console.log("[Websocket] Desconectado")
+    })
+
+    return () => {
+      socket.emit("unsubscribe-transito-hoy")
+      socket.disconnect()
+    }
+  }, [])
+
   // Animation Variants
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -487,9 +562,9 @@ export function OverviewDashboard() {
                       <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">
-                    {amountFormatter.format(metrics.recaudacionSemana)}
-                  </p>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">
+                    <RollingNumber value={amountFormatter.format(metrics.recaudacionSemana)} />
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1.5">
                     Total de los últimos 7 días
                   </p>
@@ -561,6 +636,34 @@ export function OverviewDashboard() {
 }
 
 // ----- Subcomponents -----
+
+export function RollingNumber({ value }: { value: string | number }) {
+  const strValue = String(value)
+  const chars = strValue.split("")
+
+  return (
+    <span aria-label={strValue} className="inline-flex overflow-hidden tabular-nums leading-none pb-1 -mb-1">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {chars.map((char, i) => {
+          const colIndex = chars.length - i
+          return (
+            <motion.span
+              key={`${colIndex}-${char}`}
+              initial={{ y: "100%", opacity: 0, filter: "blur(2px)" }}
+              animate={{ y: "0%", opacity: 1, filter: "blur(0px)" }}
+              exit={{ y: "-100%", opacity: 0, filter: "blur(2px)", position: "absolute" }}
+              transition={{ type: "spring", stiffness: 450, damping: 40 }}
+              aria-hidden="true"
+              className="inline-block whitespace-pre"
+            >
+              {char}
+            </motion.span>
+          )
+        })}
+      </AnimatePresence>
+    </span>
+  )
+}
 
 function DashboardSkeleton() {
   return (
@@ -689,12 +792,12 @@ function MetricCard({
               )} aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={cn(
+              <div className={cn(
                 "text-2xl font-bold tracking-tight truncate",
                 highlight === "emerald" ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"
               )}>
-                {value}
-              </p>
+                <RollingNumber value={value} />
+              </div>
             </div>
           </div>
 
