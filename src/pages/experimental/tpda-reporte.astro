@@ -1,21 +1,23 @@
----
+﻿---
 import '../../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 import { SidebarLayout } from '../../components/sidebar-layout';
 import { TpdaExperimentalReport } from '../../components/ui/tpda-experimental-report';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
+		<ClientRouter />
 		<title>Reporte TPDA (Experimental) - Sistema Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout
+		<SidebarLayout transition:persist
 			client:load
 			title="Reporte TPDA (Experimental)"
 			description="Vista comparativa diaria Cóngoma vs Los Angeles"
@@ -24,3 +26,4 @@ import { TpdaExperimentalReport } from '../../components/ui/tpda-experimental-re
 		</SidebarLayout>
 	</body>
 </html>
+

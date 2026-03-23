@@ -1,26 +1,29 @@
----
+﻿---
 import '../../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 import { SidebarLayout } from '../../components/sidebar-layout';
-import { RecaudacionAnualExperimental } from '../../components/ui/recaudacion-anual-experimental';
+import { RecaudacionAnualRedesignExperimental } from '../../components/ui/recaudacion-anual-redesign-experimental';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Recaudación Anual (Experimental) - Sistema Peajes</title>
+		<ClientRouter />
+		<title>Recaudación Anual Mensual (Experimental) - Sistema Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout
+		<SidebarLayout transition:persist
 			client:load
-			title="Recaudación Anual (Experimental)"
-			description="Reporte anual por meses y semanas"
+			title="Recaudación Anual Mensual (Experimental)"
+			description="Reporte anual por meses con KPIs y gráfico"
 		>
-			<RecaudacionAnualExperimental client:load />
+			<RecaudacionAnualRedesignExperimental client:load />
 		</SidebarLayout>
 	</body>
 </html>
+

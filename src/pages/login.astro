@@ -1,10 +1,11 @@
 ---
 import "../styles/global.css"
 import { LoginForm } from "../components/login-form"
+import { Toaster } from "@/components/ui/sonner"
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,14 +23,16 @@ import { LoginForm } from "../components/login-form"
             <p class="mt-3 text-base text-white/80">
               Analitica, recaudacion y control en tiempo real para la operacion vial.
             </p>
-            <div class="mt-8 grid gap-3">
-              <div class="rounded-xl border border-white/40 bg-white/35 px-4 py-3 shadow-lg backdrop-blur-sm">
-                <p class="text-sm font-semibold">Monitoreo de trafico</p>
-                <p class="text-xs text-white/80">Visualiza tendencias por cabina, turno y metodo de pago.</p>
+            <div class="mt-8 grid gap-4">
+              <div class="group relative rounded-xl border border-white/10 bg-black/20 p-5 shadow-2xl backdrop-blur-md transition-all hover:bg-black/30 hover:border-emerald-500/30">
+                <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100"></div>
+                <h3 class="text-base font-semibold text-emerald-300">Monitoreo de tráfico</h3>
+                <p class="mt-1 text-sm text-white/70">Visualiza tendencias por cabina, turno y método de pago en tiempo real.</p>
               </div>
-              <div class="rounded-xl border border-white/40 bg-white/35 px-4 py-3 shadow-lg backdrop-blur-sm">
-                <p class="text-sm font-semibold">Reportes inteligentes</p>
-                <p class="text-xs text-white/80">KPIs claros para decisiones rapidas y seguras.</p>
+              <div class="group relative rounded-xl border border-white/10 bg-black/20 p-5 shadow-2xl backdrop-blur-md transition-all hover:bg-black/30 hover:border-emerald-500/30">
+                <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100"></div>
+                <h3 class="text-base font-semibold text-emerald-300">Reportes inteligentes</h3>
+                <p class="mt-1 text-sm text-white/70">KPIs claros para decisiones rápidas, seguras y eficientes.</p>
               </div>
             </div>
           </div>
@@ -37,7 +40,7 @@ import { LoginForm } from "../components/login-form"
             <div class="flex items-center gap-3">
               <img src="/LOGO-COSAD25.webp" alt="Logo COSAD" class="h-24 w-auto" />
             </div>
-            <LoginForm client:load />
+            <LoginForm client:only="react" />
           </div>
         </div>
       </div>
@@ -48,5 +51,6 @@ import { LoginForm } from "../components/login-form"
         </div>
       </footer>
     </div>
+    <Toaster client:only="react" />
   </body>
 </html>

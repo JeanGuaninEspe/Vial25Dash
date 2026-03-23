@@ -1,8 +1,8 @@
-﻿---
+---
 import '../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
 import { SidebarLayout } from '../components/sidebar-layout';
-import { TableFacturacion } from '../components/ui/table-facturacion';
+import { OverviewDashboard } from '../components/ui/overview-dashboard';
 ---
 
 <!doctype html>
@@ -13,17 +13,16 @@ import { TableFacturacion } from '../components/ui/table-facturacion';
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
 		<ClientRouter />
-		<title>Facturación - Sistema de Peajes</title>
+		<title>Overview - Recaudación Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
 		<SidebarLayout transition:persist 
 			client:load
-			title="Facturación"
-			description="Gestión de facturas y reportes"
+			title="Visión General"
+			description="Resumen de tráfico y recaudación del sistema."
 		>
-			<TableFacturacion client:load />
+			<OverviewDashboard client:load />
 		</SidebarLayout>
 	</body>
 </html>
-

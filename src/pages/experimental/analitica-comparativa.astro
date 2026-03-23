@@ -1,8 +1,8 @@
-﻿---
-import '../styles/global.css';
+---
+import '../../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
-import { SidebarLayout } from '../components/sidebar-layout';
-import { TableFacturacion } from '../components/ui/table-facturacion';
+import { SidebarLayout } from '../../components/sidebar-layout';
+import { AnaliticaComparativaDashboard } from '../../components/ui/analitica-comparativa-dashboard';
 ---
 
 <!doctype html>
@@ -13,17 +13,16 @@ import { TableFacturacion } from '../components/ui/table-facturacion';
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
 		<ClientRouter />
-		<title>Facturación - Sistema de Peajes</title>
+		<title>Analítica Comparativa</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout transition:persist 
+		<SidebarLayout transition:persist
 			client:load
-			title="Facturación"
-			description="Gestión de facturas y reportes"
+			title="Analítica Comparativa"
+			description="Compara el rendimiento de peajes entre dos períodos mensuales."
 		>
-			<TableFacturacion client:load />
+			<AnaliticaComparativaDashboard client:only="react" />
 		</SidebarLayout>
 	</body>
 </html>
-

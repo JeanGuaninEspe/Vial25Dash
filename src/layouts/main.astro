@@ -3,12 +3,17 @@ import '../styles/global.css';
 const { title } = Astro.props;
 ---
 
-<html lang="en">
+<html lang="en" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<title>{title || 'Sistema de Peajes'}</title>
+		<script is:inline>
+			const storedTheme = localStorage.getItem("theme")
+			const shouldUseDark = storedTheme ? storedTheme === "dark" : true
+			document.documentElement.classList.toggle("dark", shouldUseDark)
+		</script>
 	</head>
 	<body>
 		<slot />

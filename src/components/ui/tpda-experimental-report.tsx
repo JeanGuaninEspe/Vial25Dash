@@ -1,10 +1,13 @@
 import * as React from "react"
+import { motion, type Variants } from "framer-motion"
 import { CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis } from "recharts"
-import { getISOWeek } from "date-fns"
+import { getISOWeek, getISOWeeksInYear } from "date-fns"
+import { Activity, CalendarClock, Filter, LineChart as LineChartIcon, Table, TrendingUp, RefreshCw } from "lucide-react"
 
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -21,7 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api"
+import { TrendText, generateMockVariation } from "@/components/ui/trend-text"
 
 type TpdaRow = {
   fecha: string
@@ -190,10 +197,20 @@ async function fetchTpdaPeaje(
 export function TpdaExperimentalReport() {
   const now = React.useMemo(() => new Date(), [])
   const currentYear = now.getFullYear()
+  const currentWeek = getISOWeek(now)
+  const defaultWeekSelection = React.useMemo(() => {
+    if (currentWeek > 1) {
+      return { year: currentYear, week: currentWeek - 1 }
+    }
 
-  const [year, setYear] = React.useState(String(currentYear))
+    const previousYear = currentYear - 1
+    const previousYearWeeks = getISOWeeksInYear(new Date(`${previousYear}-06-15T00:00:00`))
+    return { year: previousYear, week: previousYearWeeks }
+  }, [currentWeek, currentYear])
+
+  const [year, setYear] = React.useState(String(defaultWeekSelection.year))
   const [month, setMonth] = React.useState("all")
-  const [semana, setSemana] = React.useState("all")
+  const [semana, setSemana] = React.useState(String(defaultWeekSelection.week))
   const [formaPago, setFormaPago] = React.useState("all")
 
   const [formaPagoOptions, setFormaPagoOptions] = React.useState<string[]>([])
@@ -347,12 +364,24 @@ export function TpdaExperimentalReport() {
   const isMonthLocked = semana !== "all"
   const isWeekLocked = month !== "all"
 
+  const hasInitializedWeek = React.useRef(false)
+
   React.useEffect(() => {
-    if (semana === "all") return
-    if (!weekOptions.includes(Number(semana))) {
+    if (!weekOptions.length) return
+    if (!hasInitializedWeek.current) {
+      if (Number(year) === defaultWeekSelection.year && weekOptions.includes(defaultWeekSelection.week)) {
+        setSemana(String(defaultWeekSelection.week))
+      } else {
+        setSemana("all")
+      }
+      hasInitializedWeek.current = true
+      return
+    }
+
+    if (semana !== "all" && !weekOptions.includes(Number(semana))) {
       setSemana("all")
     }
-  }, [semana, weekOptions])
+  }, [year, semana, weekOptions, defaultWeekSelection])
 
   const filteredRows = React.useMemo(() => {
     if (semana === "all") return rows
@@ -372,262 +401,565 @@ export function TpdaExperimentalReport() {
     )
   }, [filteredRows])
 
+  const weeklyData = React.useMemo(() => {
+    const byWeek = new Map<number, number>()
+    filteredRows.forEach((row) => {
+      const week = getIsoWeekFromFecha(row.fecha)
+      const total = row.congoma + row.losAngeles
+      byWeek.set(week, (byWeek.get(week) ?? 0) + total)
+    })
+    return Array.from(byWeek.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([week, total]) => ({ week: `Semana ${week}`, total }))
+  }, [filteredRows])
+
+  const kpi = React.useMemo(() => {
+    const total = totals.general
+
+    if (semana !== "all") {
+      // Comparación real con la semana anterior
+      const currentWeek = Number(semana)
+      const prevWeekNum = currentWeek - 1
+      const prevWeekRows = rows.filter(r => getIsoWeekFromFecha(r.fecha) === prevWeekNum)
+      
+      const prevTotal = prevWeekRows.reduce((acc, r) => acc + r.congoma + r.losAngeles, 0)
+      const prevAvg = prevWeekRows.length ? prevTotal / prevWeekRows.length : 0
+      
+      const variationTotal = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0
+      
+      const avgSecondary = filteredRows.length ? total / filteredRows.length : 0
+      const variationAvg = prevAvg > 0 ? ((avgSecondary - prevAvg) / prevAvg) * 100 : 0
+
+      const days = filteredRows.map(r => ({ label: r.fecha.split("-").reverse().slice(0,2).join("/"), total: r.congoma + r.losAngeles }))
+      const maxSecondary = days.reduce(
+        (acc, item) => (item.total > acc.total ? item : acc),
+        { label: "-", total: 0 }
+      )
+
+      return {
+        total,
+        showVariation: true,
+        variationTotal,
+        baselineTotal: "la semana pasada",
+        avgSecondary,
+        variationAvg,
+        baselineAvg: "la semana pasada",
+        avgSecondaryLabel: "Promedio diario",
+        maxSecondaryLabel: maxSecondary.label,
+        maxSecondaryTotal: maxSecondary.total,
+        maxSecondaryTitle: "Día más alto"
+      }
+    } else if (month !== "all") {
+      const avgSecondary = filteredRows.length ? total / filteredRows.length : 0
+      const days = filteredRows.map(r => ({ label: r.fecha.split("-").reverse().slice(0,2).join("/"), total: r.congoma + r.losAngeles }))
+      const maxSecondary = days.reduce(
+        (acc, item) => (item.total > acc.total ? item : acc),
+        { label: "-", total: 0 }
+      )
+
+      return {
+        total,
+        showVariation: false,
+        variationTotal: 0,
+        baselineTotal: "",
+        avgSecondary,
+        variationAvg: 0,
+        baselineAvg: "",
+        avgSecondaryLabel: "Promedio diario",
+        maxSecondaryLabel: maxSecondary.label,
+        maxSecondaryTotal: maxSecondary.total,
+        maxSecondaryTitle: "Día más alto"
+      }
+    }
+
+    // Vista anual
+    const avgSecondary = weeklyData.length ? total / weeklyData.length : 0
+    const maxWeek = weeklyData.reduce(
+      (acc, item) => (item.total > acc.total ? item : acc),
+      { week: "-", total: 0 }
+    )
+
+    return { 
+      total, 
+      showVariation: false,
+      variationTotal: 0,
+      baselineTotal: "",
+      avgSecondary, 
+      variationAvg: 0,
+      baselineAvg: "",
+      avgSecondaryLabel: "Promedio semanal",
+      maxSecondaryLabel: maxWeek.week,
+      maxSecondaryTotal: maxWeek.total,
+      maxSecondaryTitle: "Semana más alta"
+    }
+  }, [totals.general, weeklyData, filteredRows, semana, month, rows])
+
+  const totalKpiLabel = React.useMemo(() => {
+    if (semana !== "all") return "Total semanal"
+    if (month !== "all") return "Total mensual"
+    return "Total anual"
+  }, [semana, month])
+
   const selectedMonthLabel = monthOptions.find((option) => option.value === month)?.label ?? month
   const hasNoData = !loading && !error && filteredRows.length === 0
   const fromDate = filteredRows[0]?.fecha
   const toDate = filteredRows[filteredRows.length - 1]?.fecha
 
+  const containerVariants: Variants = {
+    hidden: { opacity: 0, y: 12 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { staggerChildren: 0.08 },
+    },
+  }
+
+  const cardVariants: Variants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 },
+  }
+
+  const rowVariants: Variants = {
+    hidden: { opacity: 0, y: 6 },
+    show: (index: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: index * 0.015,
+        duration: 0.2,
+        ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+      },
+    }),
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-sm bg-[#555] px-4 py-1.5 text-center text-lg font-bold text-white">
-        REPORTE DE TPDA PEAJES CÓNGOMA Y LOS ANGELES
-      </div>
-
-      <Card className="border-0 shadow-none">
-        <CardContent className="p-0">
-          <div className="grid max-w-[520px] grid-cols-[150px_1fr] gap-0 border border-[#6b6b6b] bg-[#555] text-white">
-            <p className="px-2 py-1 text-sm font-extrabold">AÑO</p>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger className="h-8 rounded-none border-0 border-l border-[#6b6b6b] bg-[#555] text-sm font-semibold text-white focus:ring-0">
-                <SelectValue placeholder="Año" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <p className="border-t border-[#6b6b6b] px-2 py-1 text-sm font-extrabold">MES</p>
-            <Select
-              value={month}
-              onValueChange={(value) => {
-                setMonth(value)
-                if (value !== "all") setSemana("all")
-              }}
-              disabled={isMonthLocked}
-            >
-              <SelectTrigger className="h-8 rounded-none border-0 border-t border-l border-[#6b6b6b] bg-[#555] text-sm font-semibold text-white focus:ring-0 disabled:opacity-60">
-                <SelectValue placeholder="Mes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {monthOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <p className="border-t border-[#6b6b6b] px-2 py-1 text-sm font-extrabold">SEMANA</p>
-            <Select
-              value={semana}
-              onValueChange={(value) => {
-                setSemana(value)
-                if (value !== "all") setMonth("all")
-              }}
-              disabled={isWeekLocked}
-            >
-              <SelectTrigger className="h-8 rounded-none border-0 border-t border-l border-[#6b6b6b] bg-[#555] text-sm font-semibold text-white focus:ring-0 disabled:opacity-60">
-                <SelectValue placeholder="Semana" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {weekOptions.map((week) => (
-                  <SelectItem key={week} value={String(week)}>
-                    Semana {week}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <p className="border-t border-[#6b6b6b] px-2 py-1 text-sm font-extrabold">FORMA_PAGO</p>
-            <Select value={formaPago} onValueChange={setFormaPago}>
-              <SelectTrigger className="h-8 rounded-none border-0 border-t border-l border-[#6b6b6b] bg-[#555] text-sm font-semibold text-white focus:ring-0">
-                <SelectValue placeholder={loadingFormaPago ? "Cargando..." : "Forma de pago"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">(Todas)</SelectItem>
-                {formaPagoOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
+      <motion.div variants={cardVariants}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold text-foreground">Reporte TPDA (Experimental)</h2>
+              <p className="text-sm text-muted-foreground">
+                Vista comparativa diaria Cóngoma vs Los Angeles
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <CalendarClock className="h-3.5 w-3.5" />
+              {fromDate && toDate
+                ? `${fromDate.split("-").reverse().join("/")} - ${toDate.split("-").reverse().join("/")}`
+                : month === "all"
+                  ? `Año ${year}`
+                  : `Mes de ${selectedMonthLabel} ${year}`}
+            </span>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="border-0 shadow-none">
-        <CardContent className="p-0">
-          {loading && <p className="px-3 py-3 text-sm text-muted-foreground">Cargando datos...</p>}
-          {error && !loading && <p className="px-3 py-3 text-sm text-destructive">{error}</p>}
-          {hasNoData && (
-            <p className="px-3 py-3 text-sm text-muted-foreground">
-              No hay datos disponibles para los filtros seleccionados.
-            </p>
-          )}
-
-          {!loading && !error && filteredRows.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px]">
-                <thead className="bg-[#555] text-white">
-                  <tr>
-                    <th className="px-2 py-1 text-left text-sm font-bold">FECHA_EVENTO</th>
-                    <th className="px-2 py-1 text-right text-sm font-bold">CÓNGOMA</th>
-                    <th className="px-2 py-1 text-right text-sm font-bold">LOS ANGELES</th>
-                    <th className="px-2 py-1 text-right text-sm font-bold">TOTAL GENERAL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.map((row) => {
-                    const totalDia = row.congoma + row.losAngeles
-                    return (
-                      <tr key={row.fecha} className="border-b bg-[#bfc8db]">
-                        <td className="px-2 py-1 text-sm font-medium">{row.fecha}</td>
-                        <td className="px-2 py-1 text-right text-sm tabular-nums">
-                          {numberFormatter.format(row.congoma)}
-                        </td>
-                        <td className="px-2 py-1 text-right text-sm tabular-nums">
-                          {numberFormatter.format(row.losAngeles)}
-                        </td>
-                        <td className="px-2 py-1 text-right text-sm font-semibold tabular-nums">
-                          {numberFormatter.format(totalDia)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-[#213764] text-white">
-                    <th className="px-2 py-2 text-left text-base font-bold">Total general</th>
-                    <th className="px-2 py-2 text-right text-base font-bold tabular-nums">
-                      {numberFormatter.format(totals.congoma)}
-                    </th>
-                    <th className="px-2 py-2 text-right text-base font-bold tabular-nums">
-                      {numberFormatter.format(totals.losAngeles)}
-                    </th>
-                    <th className="px-2 py-2 text-right text-base font-bold tabular-nums">
-                      {numberFormatter.format(totals.general)}
-                    </th>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="rounded-sm bg-[#555] px-4 py-1.5 text-center text-lg font-bold text-white">
-        TOTAL TRÁNSITO DIARIO PEAJES CÓNGOMA Y LOS ANGELES
-      </div>
-
-      <Card className="border-0 shadow-none">
-        <CardHeader className="items-center text-center pb-2">
-          <CardTitle className="text-sm font-semibold text-foreground">
-            {fromDate && toDate
-              ? `De ${fromDate.split("-").reverse().join("/")} a ${toDate.split("-").reverse().join("/")}`
-              : month === "all"
-                ? `Año ${year}`
-                : `Mes de ${selectedMonthLabel} ${year}`}
-          </CardTitle>
-          <div className="flex items-center justify-center gap-6 text-sm font-semibold">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--chart-1)" }} />
-              <span>CÓNGOMA</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--chart-2)" }} />
-              <span>LOS ANGELES</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading && <p className="text-sm text-muted-foreground">Cargando gráfico...</p>}
-          {!loading && !error && filteredRows.length > 0 && (
-            <ChartContainer config={chartConfig} className="h-[500px] w-full">
-              <LineChart
-                data={filteredRows}
-                margin={{
-                  top: 64,
-                  right: 16,
-                  left: 16,
-                  bottom: 80,
+          <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border/40 bg-muted/20 p-5 shadow-sm">
+            <motion.div className="space-y-1.5" whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">Año</p>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger className="h-9 w-[140px] bg-background shadow-sm text-sm">
+                  <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+            <motion.div className="space-y-1.5" whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">Mes</p>
+              <Select
+                value={month}
+                onValueChange={(value) => {
+                  setMonth(value)
+                  if (value !== "all") setSemana("all")
+                }}
+                disabled={isMonthLocked}
+              >
+                <SelectTrigger className="h-9 w-[140px] bg-background shadow-sm text-sm">
+                  <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {monthOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+            <motion.div className="space-y-1.5" whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">Semana</p>
+              <Select
+                value={semana}
+                onValueChange={(value) => {
+                  setSemana(value)
+                  if (value !== "all") setMonth("all")
+                }}
+                disabled={isWeekLocked}
+              >
+                <SelectTrigger className="h-9 w-[140px] bg-background shadow-sm text-sm">
+                  <SelectValue placeholder="Semana" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {weekOptions.map((week) => (
+                    <SelectItem key={week} value={String(week)}>
+                      Semana {week}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+            <motion.div className="space-y-1.5" whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/80">Forma de pago</p>
+              <Select value={formaPago} onValueChange={setFormaPago}>
+                <SelectTrigger className="h-9 w-[180px] bg-background shadow-sm text-sm">
+                  <SelectValue placeholder={loadingFormaPago ? "Cargando..." : "Forma de pago"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">(Todas)</SelectItem>
+                  {formaPagoOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="ml-auto sm:ml-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 shadow-sm border-dashed hover:border-solid transition-all"
+                onClick={() => {
+                  setYear(String(defaultWeekSelection.year))
+                  setMonth("all")
+                  setSemana(String(defaultWeekSelection.week))
+                  setFormaPago("all")
                 }}
               >
-                <CartesianGrid vertical={true} />
-                <XAxis
-                  dataKey="fecha"
-                  angle={-45}
-                  textAnchor="end"
-                  height={74}
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => numberFormatter.format(value)}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(value) => `FECHA_EVENTO: ${value}`}
-                      formatter={(value, name) => (
-                        <div className="flex w-full justify-between gap-4">
-                          <span className="text-muted-foreground">{name}</span>
-                          <span className="font-mono font-medium tabular-nums">
-                            {numberFormatter.format(Number(value))}
-                          </span>
-                        </div>
-                      )}
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reset
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div variants={cardVariants}>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
+            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-primary/50">
+              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/20 blur-2xl pointer-events-none" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{totalKpiLabel}</CardTitle>
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
+                  {loading ? <Skeleton className="h-9 w-32" /> : numberFormatter.format(kpi.total)}
+                </div>
+                {!loading && kpi.showVariation && (
+                  <TrendText variation={kpi.variationTotal} baselineText={kpi.baselineTotal} />
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
+            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-emerald-500/50">
+              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl pointer-events-none" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.avgSecondaryLabel}</CardTitle>
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/25">
+                  <Activity className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
+                  {loading ? <Skeleton className="h-9 w-32" /> : numberFormatter.format(Math.round(kpi.avgSecondary))}
+                </div>
+                {!loading && kpi.showVariation && (
+                  <TrendText variation={kpi.variationAvg} baselineText={kpi.baselineAvg} />
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
+            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-amber-500/50">
+              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-amber-500/20 blur-2xl pointer-events-none" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.maxSecondaryTitle}</CardTitle>
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/25">
+                  <LineChartIcon className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-col justify-center gap-1 relative z-10">
+                <div className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
+                  {loading ? <Skeleton className="h-7 w-24" /> : kpi.maxSecondaryLabel}
+                </div>
+                {!loading && (
+                  <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                    {numberFormatter.format(kpi.maxSecondaryTotal)} tránsitos
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+        <Card className="border-border/40 bg-gradient-to-r from-card to-muted/10 shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 bg-muted/5 pb-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+                <LineChartIcon className="h-5 w-5" />
+              </span>
+              <div>
+                <CardTitle className="text-base font-semibold">Total tránsito diario</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Comparativo Cóngoma vs Los Angeles
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-5 text-xs font-semibold text-muted-foreground mr-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: "var(--color-congoma, var(--chart-1))" }} />
+                <span className="tracking-wide">CÓNGOMA</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: "var(--color-losAngeles, var(--chart-2))" }} />
+                <span className="tracking-wide">LOS ANGELES</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading && (
+              <div className="p-4">
+                <Skeleton className="h-[480px] w-full rounded-xl" />
+              </div>
+            )}
+            {!loading && !error && filteredRows.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <ChartContainer config={chartConfig} className="h-[480px] w-full">
+                  <LineChart
+                    data={filteredRows}
+                    margin={{
+                      top: 64,
+                      right: 16,
+                      left: 16,
+                      bottom: 80,
+                    }}
+                  >
+                    <CartesianGrid vertical={true} />
+                    <XAxis
+                      dataKey="fecha"
+                      angle={-45}
+                      textAnchor="end"
+                      height={74}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
                     />
-                  }
-                />
-                <Line
-                  dataKey="congoma"
-                  type="monotone"
-                  stroke="var(--color-congoma)"
-                  strokeWidth={3}
-                  dot={{ r: 3 }}
-                  name="CÓNGOMA"
-                >
-                  <LabelList
-                    dataKey="congoma"
-                    position="top"
-                    angle={-90}
-                    offset={26}
-                    formatter={(value: number) => numberFormatter.format(value)}
-                    className="fill-foreground text-xs font-semibold"
-                  />
-                </Line>
-                <Line
-                  dataKey="losAngeles"
-                  type="monotone"
-                  stroke="var(--color-losAngeles)"
-                  strokeWidth={3}
-                  dot={{ r: 3 }}
-                  name="LOS ANGELES"
-                >
-                  <LabelList
-                    dataKey="losAngeles"
-                    position="bottom"
-                    angle={-90}
-                    offset={20}
-                    formatter={(value: number) => numberFormatter.format(value)}
-                    className="fill-muted-foreground text-xs font-semibold"
-                  />
-                </Line>
-              </LineChart>
-            </ChartContainer>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => numberFormatter.format(value)}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          labelFormatter={(value) => `FECHA_EVENTO: ${value}`}
+                          formatter={(value, name) => (
+                            <div className="flex w-full justify-between gap-4">
+                              <span className="text-muted-foreground">{name}</span>
+                              <span className="font-mono font-medium tabular-nums">
+                                {numberFormatter.format(Number(value))}
+                              </span>
+                            </div>
+                          )}
+                        />
+                      }
+                    />
+                    <Line
+                      dataKey="congoma"
+                      type="monotone"
+                      stroke="var(--color-congoma)"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                      name="CÓNGOMA"
+                      isAnimationActive
+                    >
+                      <LabelList
+                        dataKey="congoma"
+                        position="top"
+                        angle={-90}
+                        offset={26}
+                        formatter={(value: number) => numberFormatter.format(value)}
+                        className="fill-foreground text-xs font-semibold"
+                      />
+                    </Line>
+                    <Line
+                      dataKey="losAngeles"
+                      type="monotone"
+                      stroke="var(--color-losAngeles)"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                      name="LOS ANGELES"
+                      isAnimationActive
+                    >
+                      <LabelList
+                        dataKey="losAngeles"
+                        position="bottom"
+                        angle={-90}
+                        offset={20}
+                        formatter={(value: number) => numberFormatter.format(value)}
+                        className="fill-muted-foreground text-xs font-semibold"
+                      />
+                    </Line>
+                  </LineChart>
+                </ChartContainer>
+              </motion.div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+        <Card className="border-border/40 bg-gradient-to-r from-card to-muted/10 shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 bg-muted/5 pb-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+                <Table className="h-5 w-5" />
+              </span>
+              <div>
+                <CardTitle className="text-base font-semibold">Detalle diario</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  {filteredRows.length} registros visibles
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading && (
+              <div className="divide-y border-t border-border/40">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="flex items-center justify-between px-6 py-4">
+                    <Skeleton className="h-6 w-28 shrink-0" />
+                    <Skeleton className="h-6 w-20 shrink-0" />
+                    <Skeleton className="h-6 w-20 shrink-0" />
+                    <Skeleton className="h-6 w-24 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {error && !loading && <p className="px-4 py-4 text-sm text-destructive">{error}</p>}
+            {hasNoData && (
+              <p className="px-4 py-4 text-sm text-muted-foreground">
+                No hay datos disponibles para los filtros seleccionados.
+              </p>
+            )}
+
+            {!loading && !error && filteredRows.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-muted/40 backdrop-blur">
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Fecha evento
+                      </th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="inline-block h-2 w-2 rounded-full shadow-sm" style={{ backgroundColor: "var(--color-congoma, var(--chart-1))" }} />
+                          Cóngoma
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="inline-block h-2 w-2 rounded-full shadow-sm" style={{ backgroundColor: "var(--color-losAngeles, var(--chart-2))" }} />
+                          Los Angeles
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Total general
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.map((row, index) => {
+                      const totalDia = row.congoma + row.losAngeles
+                      return (
+                        <motion.tr
+                          key={row.fecha}
+                          variants={rowVariants}
+                          custom={index}
+                          initial="hidden"
+                          animate="show"
+                          className={cn(
+                            "border-b border-border/40 transition-colors last:border-0 hover:bg-muted/50",
+                            index % 2 === 0 ? "bg-card/40" : "bg-muted/10",
+                          )}
+                        >
+                          <td className="px-4 py-3 text-sm font-medium text-foreground">
+                            <span className="inline-flex rounded-md border border-border/50 bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                              {row.fecha}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm tabular-nums">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium">
+                              {numberFormatter.format(row.congoma)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm tabular-nums">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 font-medium">
+                              {numberFormatter.format(row.losAngeles)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-foreground">
+                            <span className="inline-flex items-center rounded-md border border-emerald-200 dark:border-emerald-400/25 bg-emerald-100 dark:bg-emerald-500/12 px-2.5 py-0.5 text-emerald-900 dark:text-emerald-300">
+                              {numberFormatter.format(totalDia)}
+                            </span>
+                          </td>
+                        </motion.tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-border/60 bg-muted/40 text-foreground">
+                      <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Total general</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        <span className="inline-flex items-center rounded-md bg-blue-500/15 px-2.5 py-1 text-blue-800 dark:text-blue-300">
+                          {numberFormatter.format(totals.congoma)}
+                        </span>
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        <span className="inline-flex items-center rounded-md bg-purple-500/15 px-2.5 py-1 text-purple-800 dark:text-purple-300">
+                          {numberFormatter.format(totals.losAngeles)}
+                        </span>
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        <span className="inline-flex items-center rounded-md border border-emerald-300 dark:border-emerald-400/40 bg-emerald-200 dark:bg-emerald-500/20 px-2.5 py-1 font-bold text-emerald-950 dark:text-emerald-200">
+                          {numberFormatter.format(totals.general)}
+                        </span>
+                      </th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   )
 }

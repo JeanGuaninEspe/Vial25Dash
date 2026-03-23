@@ -1,5 +1,6 @@
----
+﻿---
 import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 import { ChartAreaInteractive } from '../components/ui/chart-area-interactive';
 import { ChartTransito } from '../components/ui/chart-transito';
 import { ChartRadialStacked } from '../components/ui/chart-radial-stacked';
@@ -8,17 +9,18 @@ import { DashboardWelcome } from '../components/dashboard-welcome';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
+		<ClientRouter />
 		<title>Dashboard - Recaudacion Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout 
+		<SidebarLayout transition:persist 
 			client:load
 			title="Dashboard de Peajes"
 			description="Sistema de monitoreo y análisis"
@@ -36,3 +38,4 @@ import { DashboardWelcome } from '../components/dashboard-welcome';
 		</SidebarLayout>
 	</body>
 </html>
+

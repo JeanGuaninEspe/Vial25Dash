@@ -1,0 +1,29 @@
+﻿---
+import "../styles/global.css"
+import { ClientRouter } from 'astro:transitions';
+import { SidebarLayout } from "../components/sidebar-layout"
+import { AdminPanel } from "../components/ui/admin-panel"
+---
+
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
+    <meta name="generator" content={Astro.generator} />
+		<ClientRouter />
+    <title>Panel de Administrador - Sistema de Peajes</title>
+  </head>
+
+  <body class="bg-background text-foreground antialiased">
+    <SidebarLayout transition:persist
+      client:load
+      title="Panel de Administrador"
+      description="Gestion centralizada de usuarios y registros RFID"
+    >
+      <AdminPanel client:load />
+    </SidebarLayout>
+  </body>
+</html>
+

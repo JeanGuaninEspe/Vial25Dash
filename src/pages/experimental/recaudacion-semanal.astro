@@ -2,7 +2,7 @@
 import '../../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
 import { SidebarLayout } from '../../components/sidebar-layout';
-import { RecaudacionReporteDiarioPeajesExperimental } from '../../components/ui/recaudacion-reporte-diario-peajes-experimental';
+import { RecaudacionSemanalExperimental } from '../../components/ui/recaudacion-semanal-experimental';
 ---
 
 <!doctype html>
@@ -13,16 +13,16 @@ import { RecaudacionReporteDiarioPeajesExperimental } from '../../components/ui/
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
 		<ClientRouter />
-		<title>Recaudación Diario Peajes (Experimental) - Sistema Peajes</title>
+		<title>Recaudación Semanal (Experimental) - Sistema Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
 		<SidebarLayout transition:persist
 			client:load
-			title="Recaudación Diario Peajes (Experimental)"
-			description="Reporte diario por peajes con KPIs y gráfico"
+			title="Recaudación Semanal (Experimental)"
+			description="Reporte semanal con KPIs y gráfico, acotado al periodo disponible"
 		>
-			<RecaudacionReporteDiarioPeajesExperimental client:load />
+			<RecaudacionSemanalExperimental client:load />
 		</SidebarLayout>
 	</body>
 </html>

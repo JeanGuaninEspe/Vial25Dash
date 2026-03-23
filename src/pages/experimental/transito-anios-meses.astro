@@ -1,21 +1,23 @@
----
+﻿---
 import '../../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 import { SidebarLayout } from '../../components/sidebar-layout';
 import { TransitoAniosMesesExperimental } from '../../components/ui/transito-anios-meses-experimental';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
 		<meta name="generator" content={Astro.generator} />
+		<ClientRouter />
 		<title>Tránsito por Años y Meses (Experimental) - Sistema Peajes</title>
 	</head>
 
 	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout
+		<SidebarLayout transition:persist
 			client:load
 			title="Tránsito por Años y Meses (Experimental)"
 			description="Reporte comparativo por mes y año"
@@ -24,3 +26,4 @@ import { TransitoAniosMesesExperimental } from '../../components/ui/transito-ani
 		</SidebarLayout>
 	</body>
 </html>
+
