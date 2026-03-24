@@ -286,8 +286,23 @@ export function RecaudacionReporteDiarioPeajesExperimental() {
         const nextWeekValue = selectedWeek < weeksInSelectedYear ? selectedWeek + 1 : 1
         const nextWeekPayload = await fetchWeek(nextWeekYear, nextWeekValue)
 
+        // CASO ESPECIAL: Si es semana 1, el backend podria haber asignado los ultimos dias de diciembre
+        // al (año previo, sem 1) o (año previo, sem 53) dependiendo del motor de SQL.
+        let extraPayload1 = { data: [] as RecaudacionDetalle[] }
+        let extraPayload53 = { data: [] as RecaudacionDetalle[] }
+        if (selectedWeek === 1) {
+          try { extraPayload1 = await fetchWeek(selectedYear - 1, 1) } catch { /* ignore */ }
+          try { extraPayload53 = await fetchWeek(selectedYear - 1, 53) } catch { /* ignore */ }
+        }
+
         const mergedDataMap = new Map<string, RecaudacionDetalle>()
-        ;[...prevWeekPayload.data, ...currentWeekPayload.data, ...nextWeekPayload.data].forEach((row) => {
+        ;[
+          ...prevWeekPayload.data, 
+          ...currentWeekPayload.data, 
+          ...nextWeekPayload.data,
+          ...extraPayload1.data,
+          ...extraPayload53.data
+        ].forEach((row) => {
           const key = `${row.nombrePeaje}|${row.fecha}|${row.recaudacionEfectivo}|${row.totalDepositado}`
           mergedDataMap.set(key, row)
         })
