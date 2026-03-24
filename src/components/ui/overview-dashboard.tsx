@@ -65,6 +65,7 @@ const numberFormatter = new Intl.NumberFormat("es-EC")
 
 // ----- Constants -----
 const BASE_URL = import.meta.env.PUBLIC_BASE_URL || ""
+const SOCKET_IO_PATH = import.meta.env.PUBLIC_SOCKET_IO_PATH || "/v1/socket.io"
 const RECAUDACION_DIARIO_ENDPOINT = "/recaudacion"
 const TRANSITO_ENDPOINT = "/r-estadistico/reporte-mensual-semanal"
 const RFID_ENDPOINT = "/api/v2/descuentos-rfid"
@@ -349,6 +350,7 @@ export function OverviewDashboard() {
     }
 
     const socket = io(socketUrl, {
+      path: SOCKET_IO_PATH,
       reconnectionDelayMax: 10000,
     })
 
