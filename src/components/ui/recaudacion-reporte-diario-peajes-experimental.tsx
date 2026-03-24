@@ -1,6 +1,6 @@
 import * as React from "react"
 import { motion, type Variants } from "framer-motion"
-import { getISOWeek, getISOWeeksInYear } from "date-fns"
+import { getISOWeek, getISOWeeksInYear, startOfISOWeekYear } from "date-fns"
 import { Area, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, XAxis, YAxis } from "recharts"
 import {
   ArrowDown,
@@ -171,13 +171,13 @@ function parseApiDate(value: string) {
 }
 
 function getIsoWeekRange(year: number, week: number) {
-  const jan4 = new Date(year, 0, 4)
-  const jan4Day = jan4.getDay() || 7
-  const week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - jan4Day + 1)
+  const week1Monday = startOfISOWeekYear(new Date(`${year}-06-15T12:00:00`))
 
+  // Caso especial solicitado: la semana 1 incluye dias del anio previo.
   const monday = new Date(week1Monday)
-  monday.setDate(week1Monday.getDate() + (week - 1) * 7)
+  if (week > 1) {
+    monday.setDate(week1Monday.getDate() + (week - 1) * 7)
+  }
 
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)

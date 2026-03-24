@@ -74,6 +74,10 @@ export function OverviewDashboard() {
   const [loading, setLoading] = React.useState(true)
   const [refreshing, setRefreshing] = React.useState(false)
   const [lastUpdate, setLastUpdate] = React.useState<Date>(new Date())
+  const liveCountsRef = React.useRef<{ congoma: number | null; losAngeles: number | null }>({
+    congoma: null,
+    losAngeles: null,
+  })
 
   // Data States
   const [metrics, setMetrics] = React.useState<MetricsState>({
@@ -274,6 +278,12 @@ export function OverviewDashboard() {
       const currentHour = Math.max(new Date().getHours(), 1)
       const promedioHora = Math.floor(trHoyTotal / currentHour)
 
+      // Seed de valores por peaje para que el socket no sobreescriba con parciales.
+      liveCountsRef.current = {
+        congoma: trHoyC,
+        losAngeles: trHoyL,
+      }
+
       setMetrics({
         transitoHoy: trHoyTotal,
         transitoVar,
@@ -354,8 +364,13 @@ export function OverviewDashboard() {
       reconnectionDelayMax: 10000,
     })
 
-    // Mantenemos un estado local para ir sumando ambos peajes si el backend envía por separado
-    const liveCounts = { congoma: 0, losAngeles: 0 }
+    const normalizePeaje = (value?: string) =>
+      String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase()
 
     socket.on("connect", () => {
       console.log("[Websocket] Conectado a transito-hoy live")
@@ -369,23 +384,47 @@ export function OverviewDashboard() {
       // { fecha: "2026-03-23", idPeaje: 1, nombrePeaje: "CONGOMA", totalTransitos: 8437, ... }
 
       if (data && typeof data === "object") {
-        const peaje = data.nombrePeaje?.toUpperCase()
-        const conteo = data.totalTransitos || data.total || data.cantidad || 0
+        const peaje = normalizePeaje(data.nombrePeaje)
+        const rawConteo = data.totalTransitos ?? data.total ?? data.cantidad ?? 0
+        const conteo = Number(rawConteo)
 
-        if (peaje === "CONGOMA") liveCounts.congoma = conteo
-        else if (peaje === "LOS ANGELES") liveCounts.losAngeles = conteo
-        else if (!peaje) {
-          // Fallback por si manda el total sin nombre de peaje
-          liveCounts.congoma = conteo
-          liveCounts.losAngeles = 0
+        if (!Number.isFinite(conteo)) {
+          return
         }
-        
-        const newTotal = liveCounts.congoma + liveCounts.losAngeles
 
-        if (newTotal > 0) {
+        if (peaje === "CONGOMA") {
+          liveCountsRef.current.congoma = conteo
+        } else if (peaje === "LOS ANGELES") {
+          liveCountsRef.current.losAngeles = conteo
+        } else if (!peaje) {
+          // Si backend envía total agregado sin peaje, lo usamos directamente.
+          setMetrics(prev => {
+            if (prev.transitoHoy === conteo) return prev
+            const transitoVar = prev.vehiculosAyer > 0 ? ((conteo - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
+            const tpdaEstimado = Math.floor(conteo * 1.15)
+            return {
+              ...prev,
+              transitoHoy: conteo,
+              transitoVar,
+              tpdaEstimado,
+              tpdaVar: transitoVar,
+            }
+          })
+          setLastUpdate(new Date(data.actualizadoEn || new Date()))
+          return
+        }
+
+        const { congoma, losAngeles } = liveCountsRef.current
+        if (typeof congoma === "number" && typeof losAngeles === "number") {
+          const newTotal = congoma + losAngeles
+
+          if (newTotal < 0) {
+            return
+          }
+
           setMetrics(prev => {
             // Si prev.transitoHoy ya es el mismo, no disparamos un re-render
-            if (prev.transitoHoy === newTotal) return prev;
+            if (prev.transitoHoy === newTotal) return prev
             
             const transitoVar = prev.vehiculosAyer > 0 ? ((newTotal - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
             const tpdaEstimado = Math.floor(newTotal * 1.15)

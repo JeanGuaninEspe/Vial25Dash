@@ -1,7 +1,7 @@
 import * as React from "react"
 import { motion, type Variants } from "framer-motion"
 import { CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis } from "recharts"
-import { getISOWeek, getISOWeeksInYear } from "date-fns"
+import { getISOWeek, getISOWeeksInYear, startOfISOWeekYear } from "date-fns"
 import { Activity, CalendarClock, Filter, LineChart as LineChartIcon, Table, TrendingUp, RefreshCw } from "lucide-react"
 
 import {
@@ -143,6 +143,13 @@ function buildYearRange(year: number, currentDate: Date) {
     : `${year}-12-31`
 
   return { from, to }
+}
+
+function toDateInputValue(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
 function getIsoWeekFromFecha(fecha: string) {
@@ -305,11 +312,25 @@ export function TpdaExperimentalReport() {
       try {
         const selectedYear = Number(year)
         const selectedMonth = Number(month)
-        const range = month === "all"
-          ? buildYearRange(selectedYear, now)
-          : buildMonthRange(selectedYear, selectedMonth)
+        const range = (() => {
+          if (month !== "all") {
+            return buildMonthRange(selectedYear, selectedMonth)
+          }
 
-        const rowsCacheKey = `rows:${year}:${month}:${formaPago}`
+          const baseRange = buildYearRange(selectedYear, now)
+          // Caso especial: semana 1 debe incluir los dias ISO del anio previo.
+          if (semana === "1") {
+            const isoYearStart = startOfISOWeekYear(new Date(`${selectedYear}-06-15T12:00:00`))
+            return {
+              from: toDateInputValue(isoYearStart),
+              to: baseRange.to,
+            }
+          }
+
+          return baseRange
+        })()
+
+        const rowsCacheKey = `rows:${year}:${month}:${semana}:${formaPago}`
         const cachedRows = getCachedItem<TpdaRow[]>(rowsCacheKey)
 
         let data: TpdaRow[]
@@ -355,7 +376,7 @@ export function TpdaExperimentalReport() {
     return () => {
       isMounted = false
     }
-  }, [year, month, formaPago])
+  }, [year, month, semana, formaPago, now])
 
   const weekOptions = React.useMemo(() => {
     return Array.from(new Set(rows.map((row) => getIsoWeekFromFecha(row.fecha)))).sort((a, b) => a - b)
