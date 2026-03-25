@@ -19,7 +19,6 @@ import {
   Info,
 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts"
-import { io } from "socket.io-client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,6 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
+import { useTransitoHoyLive } from "@/hooks/use-transito-hoy-live"
 import { apiFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -65,7 +65,6 @@ const numberFormatter = new Intl.NumberFormat("es-EC")
 
 // ----- Constants -----
 const BASE_URL = import.meta.env.PUBLIC_BASE_URL || ""
-const SOCKET_IO_PATH = import.meta.env.PUBLIC_SOCKET_IO_PATH || "/v1/socket.io"
 const RECAUDACION_DIARIO_ENDPOINT = "/recaudacion"
 const TRANSITO_ENDPOINT = "/r-estadistico/reporte-mensual-semanal"
 const RFID_ENDPOINT = "/api/v2/descuentos-rfid"
@@ -74,10 +73,7 @@ export function OverviewDashboard() {
   const [loading, setLoading] = React.useState(true)
   const [refreshing, setRefreshing] = React.useState(false)
   const [lastUpdate, setLastUpdate] = React.useState<Date>(new Date())
-  const liveCountsRef = React.useRef<{ congoma: number | null; losAngeles: number | null }>({
-    congoma: null,
-    losAngeles: null,
-  })
+  const [liveSeedCounts, setLiveSeedCounts] = React.useState<Record<string, number>>({})
 
   // Data States
   const [metrics, setMetrics] = React.useState<MetricsState>({
@@ -100,6 +96,11 @@ export function OverviewDashboard() {
   const [revenueChartData, setRevenueChartData] = React.useState<any[]>([])
   const [alerts, setAlerts] = React.useState<AlertItem[]>([])
   const [dates, setDates] = React.useState({ hoyStr: "", ayerStr: "" })
+  const livePeajes = React.useMemo(() => ["CONGOMA", "LOS ANGELES"], [])
+  const { liveTotal, liveUpdatedAt } = useTransitoHoyLive({
+    peajes: livePeajes,
+    seedCounts: liveSeedCounts,
+  })
 
   const fetchDashboardData = React.useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -278,11 +279,11 @@ export function OverviewDashboard() {
       const currentHour = Math.max(new Date().getHours(), 1)
       const promedioHora = Math.floor(trHoyTotal / currentHour)
 
-      // Seed de valores por peaje para que el socket no sobreescriba con parciales.
-      liveCountsRef.current = {
-        congoma: trHoyC,
-        losAngeles: trHoyL,
-      }
+      // Seed de valores por peaje para que el socket tenga base antes de recibir ambos eventos.
+      setLiveSeedCounts({
+        CONGOMA: trHoyC,
+        "LOS ANGELES": trHoyL,
+      })
 
       setMetrics({
         transitoHoy: trHoyTotal,
@@ -309,23 +310,23 @@ export function OverviewDashboard() {
       if (recaudacionVar < 0) {
         curAlerts.push({
           type: "warning",
-          title: "Caída en Recaudación",
-          desc: `El cierre de ayer fue ${Math.abs(recaudacionVar).toFixed(1)}% menor que el día previo.`,
-          icon: TrendingDown,
+          title: "Caida de Recaudacion",
+          desc: `La recaudacion de ayer disminuyo ${Math.abs(recaudacionVar).toFixed(1)}% respecto al dia anterior.`,
+          icon: AlertCircle,
         })
       }
-      if (bestDay && bestDay.total > trHoyTotal) {
+      if (bestDay) {
         curAlerts.push({
           type: "positive",
-          title: "Pico de Tráfico Reciente",
-          desc: `El ${format(new Date(bestDay.date + "T12:00:00"), "dd MMM", { locale: es })} tuvo récord con ${numberFormatter.format(bestDay.total)} cruces.`,
+          title: "Pico de Trafico Reciente",
+          desc: `El ${format(new Date(bestDay.date + "T12:00:00"), "dd MMM", { locale: es })} tuvo record con ${numberFormatter.format(bestDay.total)} cruces.`,
           icon: TrendingUp,
         })
       }
       curAlerts.push({
         type: "info",
         title: "Status de Peajes",
-        desc: "Sincronización estable. 0 desconexiones activas.",
+        desc: "Sincronizacion estable. 0 desconexiones activas.",
         icon: Activity,
       })
       setAlerts(curAlerts)
@@ -348,109 +349,27 @@ export function OverviewDashboard() {
     fetchDashboardData()
   }, [fetchDashboardData])
 
-  // Websocket Live Data for Transito Hoy
   React.useEffect(() => {
-    let baseUrl = import.meta.env.PUBLIC_BASE_URL || ""
-    let socketUrl = ""
-    try {
-      const urlObj = new URL(baseUrl)
-      socketUrl = urlObj.origin + "/r-estadistico-live"
-    } catch {
-      socketUrl = "https://api.vial25.dpdns.org/r-estadistico-live"
-    }
+    if (typeof liveTotal !== "number") return
 
-    const socket = io(socketUrl, {
-      path: SOCKET_IO_PATH,
-      reconnectionDelayMax: 10000,
-    })
+    setMetrics((prev) => {
+      if (prev.transitoHoy === liveTotal) return prev
+      const transitoVar = prev.vehiculosAyer > 0 ? ((liveTotal - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
+      const tpdaEstimado = Math.floor(liveTotal * 1.15)
 
-    const normalizePeaje = (value?: string) =>
-      String(value || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase()
-
-    socket.on("connect", () => {
-      console.log("[Websocket] Conectado a transito-hoy live")
-      // Emitimos dos suscripciones para recibir la data de ambos peajes
-      socket.emit("subscribe-transito-hoy", { nombrePeaje: "CONGOMA" })
-      socket.emit("subscribe-transito-hoy", { nombrePeaje: "LOS ANGELES" })
-    })
-
-    socket.on("transito-hoy-update", (data: any) => {
-      // Data expected structure: 
-      // { fecha: "2026-03-23", idPeaje: 1, nombrePeaje: "CONGOMA", totalTransitos: 8437, ... }
-
-      if (data && typeof data === "object") {
-        const peaje = normalizePeaje(data.nombrePeaje)
-        const rawConteo = data.totalTransitos ?? data.total ?? data.cantidad ?? 0
-        const conteo = Number(rawConteo)
-
-        if (!Number.isFinite(conteo)) {
-          return
-        }
-
-        if (peaje === "CONGOMA") {
-          liveCountsRef.current.congoma = conteo
-        } else if (peaje === "LOS ANGELES") {
-          liveCountsRef.current.losAngeles = conteo
-        } else if (!peaje) {
-          // Si backend envía total agregado sin peaje, lo usamos directamente.
-          setMetrics(prev => {
-            if (prev.transitoHoy === conteo) return prev
-            const transitoVar = prev.vehiculosAyer > 0 ? ((conteo - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
-            const tpdaEstimado = Math.floor(conteo * 1.15)
-            return {
-              ...prev,
-              transitoHoy: conteo,
-              transitoVar,
-              tpdaEstimado,
-              tpdaVar: transitoVar,
-            }
-          })
-          setLastUpdate(new Date(data.actualizadoEn || new Date()))
-          return
-        }
-
-        const { congoma, losAngeles } = liveCountsRef.current
-        if (typeof congoma === "number" && typeof losAngeles === "number") {
-          const newTotal = congoma + losAngeles
-
-          if (newTotal < 0) {
-            return
-          }
-
-          setMetrics(prev => {
-            // Si prev.transitoHoy ya es el mismo, no disparamos un re-render
-            if (prev.transitoHoy === newTotal) return prev
-            
-            const transitoVar = prev.vehiculosAyer > 0 ? ((newTotal - prev.vehiculosAyer) / prev.vehiculosAyer) * 100 : 0
-            const tpdaEstimado = Math.floor(newTotal * 1.15)
-            
-            return {
-              ...prev,
-              transitoHoy: newTotal,
-              transitoVar,
-              tpdaEstimado,
-              tpdaVar: transitoVar,
-            }
-          })
-          setLastUpdate(new Date(data.actualizadoEn || new Date()))
-        }
+      return {
+        ...prev,
+        transitoHoy: liveTotal,
+        transitoVar,
+        tpdaEstimado,
+        tpdaVar: transitoVar,
       }
     })
 
-    socket.on("disconnect", () => {
-      console.log("[Websocket] Desconectado")
-    })
-
-    return () => {
-      socket.emit("unsubscribe-transito-hoy")
-      socket.disconnect()
+    if (liveUpdatedAt) {
+      setLastUpdate(liveUpdatedAt)
     }
-  }, [])
+  }, [liveTotal, liveUpdatedAt])
 
   // Animation Variants
   const containerVariants: Variants = {
