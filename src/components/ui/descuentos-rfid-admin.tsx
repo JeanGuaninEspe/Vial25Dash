@@ -1,6 +1,6 @@
 import * as React from "react"
 import { motion, type Variants } from "framer-motion"
-import { AlertCircle, ArrowUpDown, CalendarIcon, ChevronDown, ChevronUp, FileX, Info, Mail, MoreHorizontal, Pencil, Phone, Plus, Power, PowerOff, RefreshCw, Search, SlidersHorizontal, Sparkles } from "lucide-react"
+import { AlertCircle, ArrowUpDown, CalendarIcon, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, FileX, Info, Mail, MoreHorizontal, Pencil, Phone, Plus, Power, PowerOff, RefreshCw, Search, SlidersHorizontal, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -226,6 +226,321 @@ function DatePickerField({
   )
 }
 
+// ----- Report Generation -----
+
+type ReportType =
+  | "listado-general"
+  | "proximos-vencer"
+  | "vencidos-activos"
+  | "por-peaje"
+  | "altas-mes"
+  | "pasadas-no-autorizadas"
+
+const REPORT_TYPES: ReportType[] = [
+  "listado-general",
+  "proximos-vencer",
+  "vencidos-activos",
+  "por-peaje",
+  "altas-mes",
+  "pasadas-no-autorizadas",
+]
+
+const REPORT_LABELS: Record<ReportType, string> = {
+  "listado-general": "Listado General (vista actual)",
+  "proximos-vencer": "Próximos a Vencer (60 días)",
+  "vencidos-activos": "Vencidos con Descuento Activo",
+  "por-peaje": "Por Peaje",
+  "altas-mes": "Altas del Mes Actual",
+  "pasadas-no-autorizadas": "Pasadas No Autorizadas",
+}
+
+const FILENAME_MAP: Record<ReportType, string> = {
+  "listado-general": "rfid-listado-general",
+  "proximos-vencer": "rfid-proximos-vencer",
+  "vencidos-activos": "rfid-vencidos-activos",
+  "por-peaje": "rfid-por-peaje",
+  "altas-mes": "rfid-altas-mes",
+  "pasadas-no-autorizadas": "rfid-pasadas-no-autorizadas",
+}
+
+const PDF_COLUMNS = ["Apellidos y Nombres", "Cédula/RUC", "Placa", "Peaje", "Autorización", "Vigencia", "Vencimiento", "Estado"]
+
+const EXCEL_HEADERS = [
+  "Apellidos y Nombres", "Cédula/RUC", "Placa", "Doc. Ingreso",
+  "Fecha Ingreso", "Asunto", "Peaje", "Autorización", "Vigencia",
+  "Fecha Vencimiento", "Estado", "Correo", "Teléfono",
+  "Observación", "Última Pasada No Aut.",
+]
+
+function loadLogoAsDataURL(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx) { reject(new Error("No canvas 2d context")); return }
+      ctx.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL("image/png"))
+    }
+    img.onerror = reject
+    img.src = "/LOGO-COSAD25.webp"
+  })
+}
+
+function mapRowForPDF(row: DescuentoRfid): string[] {
+  return [
+    displayText(row.apellidosYNombres),
+    displayText(row.cedulaORuc),
+    displayText(row.placa),
+    displayText(row.peaje),
+    displayText(row.autorizacion),
+    formatDate(row.vigencia),
+    formatDate(row.fechaVencimientoReal),
+    row.activo === true ? "Activo" : row.activo === false ? "Inactivo" : "-",
+  ]
+}
+
+function mapRowForExcel(row: DescuentoRfid): string[] {
+  return [
+    displayText(row.apellidosYNombres),
+    displayText(row.cedulaORuc),
+    displayText(row.placa),
+    displayText(row.documentoIngreso),
+    formatDate(row.fecha),
+    displayText(row.asunto),
+    displayText(row.peaje),
+    displayText(row.autorizacion),
+    formatDate(row.vigencia),
+    formatDate(row.fechaVencimientoReal),
+    row.activo === true ? "Activo" : row.activo === false ? "Inactivo" : "-",
+    displayText(row.correo),
+    displayText(row.telefono),
+    displayText(row.observacion),
+    formatDate(row.ultimaPasadaConDescuentoNoAutorizado),
+  ]
+}
+
+function getReportRows(type: ReportType, rows: DescuentoRfid[], filteredRows: DescuentoRfid[]): DescuentoRfid[] {
+  if (type === "listado-general") return filteredRows
+  if (type === "por-peaje") return rows
+  const now = Date.now()
+  const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000
+  if (type === "proximos-vencer") {
+    return rows.filter((r) => {
+      if (!r.fechaVencimientoReal) return false
+      const d = new Date(r.fechaVencimientoReal).getTime()
+      return !Number.isNaN(d) && d > now && d - now <= sixtyDaysMs
+    })
+  }
+  if (type === "vencidos-activos") {
+    return rows.filter((r) => {
+      if (!r.fechaVencimientoReal || r.activo !== true) return false
+      const d = new Date(r.fechaVencimientoReal).getTime()
+      return !Number.isNaN(d) && d < now
+    })
+  }
+  if (type === "altas-mes") {
+    const current = new Date()
+    const y = current.getFullYear()
+    const m = current.getMonth()
+    return rows.filter((r) => {
+      if (!r.fecha) return false
+      const d = new Date(r.fecha)
+      return d.getFullYear() === y && d.getMonth() === m
+    })
+  }
+  if (type === "pasadas-no-autorizadas") {
+    return rows.filter((r) => Boolean(r.ultimaPasadaConDescuentoNoAutorizado))
+  }
+  return rows
+}
+
+async function generatePDF(type: ReportType, rows: DescuentoRfid[], filteredRows: DescuentoRfid[]) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ])
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
+  const reportTitle = REPORT_LABELS[type]
+  const dateStr = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  let logoDataUrl: string | null = null
+  try { logoDataUrl = await loadLogoAsDataURL() } catch { /* sin logo */ }
+
+  const drawHeader = (title: string) => {
+    if (logoDataUrl) {
+      try { doc.addImage(logoDataUrl, "PNG", 10, 6, 52, 14) } catch { /* skip */ }
+    }
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.setTextColor(30, 58, 95)
+    doc.text(title, pageW / 2, 13, { align: "center" })
+    doc.setFontSize(9)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(107, 114, 128)
+    doc.text("Sistema de Peajes COSAD25", pageW / 2, 18, { align: "center" })
+    doc.text(dateStr, pageW - 10, 13, { align: "right" })
+    doc.setDrawColor(30, 58, 95)
+    doc.setLineWidth(0.4)
+    doc.line(10, 23, pageW - 10, 23)
+  }
+
+  const renderTable = (data: DescuentoRfid[], startY = 28) => {
+    autoTable(doc, {
+      head: [PDF_COLUMNS],
+      body: data.map(mapRowForPDF),
+      startY,
+      styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },
+      headStyles: {
+        fillColor: [30, 58, 95] as [number, number, number],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      alternateRowStyles: { fillColor: [240, 244, 248] as [number, number, number] },
+      columnStyles: {
+        0: { cellWidth: 52 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 18 },
+      },
+      margin: { left: 10, right: 10, top: 28 },
+      didDrawPage: (hookData: any) => {
+        const pageCount = (doc.internal as any).getNumberOfPages()
+        doc.setFontSize(7.5)
+        doc.setTextColor(160)
+        doc.text(
+          `Generado por Sistema COSAD25  ·  Página ${hookData.pageNumber} de ${pageCount}`,
+          pageW / 2,
+          pageH - 5,
+          { align: "center" },
+        )
+      },
+    })
+  }
+
+  if (type === "por-peaje") {
+    const congoma = rows.filter((r) => normalizeText(r.peaje).includes("congoma"))
+    const losAngeles = rows.filter((r) => normalizeText(r.peaje).includes("angeles"))
+    drawHeader("Descuentos RFID — Peaje CONGOMA")
+    renderTable(congoma)
+    doc.addPage()
+    drawHeader("Descuentos RFID — Peaje LOS ANGELES")
+    renderTable(losAngeles)
+  } else {
+    drawHeader(`Descuentos RFID — ${reportTitle}`)
+    renderTable(getReportRows(type, rows, filteredRows))
+  }
+
+  doc.save(`${FILENAME_MAP[type]}.pdf`)
+}
+
+async function generateExcel(type: ReportType, rows: DescuentoRfid[], filteredRows: DescuentoRfid[]) {
+  const exceljs = await import("exceljs")
+  const ExcelJS = (exceljs as any).default ?? exceljs
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = "Sistema COSAD25"
+  workbook.created = new Date()
+
+  const dateStr = new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "long", year: "numeric" })
+  const colCount = EXCEL_HEADERS.length
+
+  const setupSheet = (sheet: any, data: DescuentoRfid[], title: string) => {
+    // Row 1: Title
+    sheet.addRow([title])
+    sheet.mergeCells(1, 1, 1, colCount)
+    const titleCell = sheet.getRow(1).getCell(1)
+    titleCell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 14, name: "Calibri" }
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1e3a5f" } }
+    titleCell.alignment = { vertical: "middle", horizontal: "center" }
+    sheet.getRow(1).height = 32
+
+    // Row 2: Date
+    sheet.addRow([`Generado el: ${dateStr}  ·  Sistema COSAD25`])
+    sheet.mergeCells(2, 1, 2, colCount)
+    const subtitleCell = sheet.getRow(2).getCell(1)
+    subtitleCell.font = { color: { argb: "FF6b7280" }, size: 9, name: "Calibri" }
+    subtitleCell.alignment = { horizontal: "right" }
+    subtitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFf1f5f9" } }
+    sheet.getRow(2).height = 18
+
+    // Row 3: Headers
+    sheet.addRow(EXCEL_HEADERS)
+    const headerRow = sheet.getRow(3)
+    headerRow.height = 22
+    headerRow.eachCell((cell: any) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9, name: "Calibri" }
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563eb" } }
+      cell.alignment = { vertical: "middle", horizontal: "center" }
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF1d4ed8" } },
+        bottom: { style: "thin", color: { argb: "FF1d4ed8" } },
+        left: { style: "thin", color: { argb: "FF1d4ed8" } },
+        right: { style: "thin", color: { argb: "FF1d4ed8" } },
+      }
+    })
+
+    sheet.views = [{ state: "frozen", xSplit: 0, ySplit: 3, topLeftCell: "A4", activeCell: "A4" }]
+
+    // Data rows
+    data.forEach((row, i) => {
+      sheet.addRow(mapRowForExcel(row))
+      const dataRow = sheet.getRow(4 + i)
+      dataRow.height = 17
+      const isEven = i % 2 === 0
+      dataRow.eachCell({ includeEmpty: true }, (cell: any) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isEven ? "FFF8FAFC" : "FFFFFFFF" } }
+        cell.border = {
+          bottom: { style: "thin", color: { argb: "FFe2e8f0" } },
+          right: { style: "thin", color: { argb: "FFe2e8f0" } },
+        }
+        cell.font = { size: 9, name: "Calibri" }
+      })
+    })
+
+    // Auto column widths
+    sheet.columns.forEach((col: any, ci: number) => {
+      const maxContent = data.reduce((max, row) => Math.max(max, String(mapRowForExcel(row)[ci] ?? "").length), 0)
+      const headerLen = EXCEL_HEADERS[ci]?.length ?? 10
+      col.width = Math.min(Math.max(maxContent, headerLen) + 3, 45)
+    })
+  }
+
+  if (type === "por-peaje") {
+    const congoma = rows.filter((r) => normalizeText(r.peaje).includes("congoma"))
+    const losAngeles = rows.filter((r) => normalizeText(r.peaje).includes("angeles"))
+    setupSheet(workbook.addWorksheet("CONGOMA"), congoma, "Descuentos RFID — Peaje CONGOMA")
+    setupSheet(workbook.addWorksheet("LOS ANGELES"), losAngeles, "Descuentos RFID — Peaje LOS ANGELES")
+  } else {
+    setupSheet(
+      workbook.addWorksheet(REPORT_LABELS[type].slice(0, 31)),
+      getReportRows(type, rows, filteredRows),
+      `Descuentos RFID — ${REPORT_LABELS[type]}`,
+    )
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${FILENAME_MAP[type]}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export function DescuentosRfidAdmin() {
   const [rows, setRows] = React.useState<DescuentoRfid[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -261,6 +576,7 @@ export function DescuentosRfidAdmin() {
   const [editVigenciaOpen, setEditVigenciaOpen] = React.useState(false)
   const [editError, setEditError] = React.useState<string | null>(null)
   const [updating, setUpdating] = React.useState(false)
+  const [exportLoading, setExportLoading] = React.useState(false)
 
   const handleCreateFieldChange = (key: keyof CreateFormState, value: string) => {
     setCreateForm((previous) => ({ ...previous, [key]: value }))
@@ -469,6 +785,21 @@ export function DescuentosRfidAdmin() {
     setVigenciaSort((current) => (current === "asc" ? "desc" : "asc"))
   }
 
+  const handleExport = async (format: "pdf" | "xlsx", type: ReportType) => {
+    setExportLoading(true)
+    try {
+      if (format === "pdf") {
+        await generatePDF(type, rows, filteredRows)
+      } else {
+        await generateExcel(type, rows, filteredRows)
+      }
+    } catch (e) {
+      console.error("Export error:", e)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   const fetchRows = React.useCallback(async () => {
     setLoading(true)
 
@@ -599,6 +930,42 @@ export function DescuentosRfidAdmin() {
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 Actualizar
               </Button>
+
+              {/* Export DropdownMenu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={exportLoading} className="gap-2 shadow-sm">
+                    {exportLoading
+                      ? <RefreshCw className="h-4 w-4 animate-spin" />
+                      : <Download className="h-4 w-4" />
+                    }
+                    Exportar
+                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-2">
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    Exportar como PDF
+                  </DropdownMenuLabel>
+                  {REPORT_TYPES.map((type) => (
+                    <DropdownMenuItem key={`pdf-${type}`} onClick={() => handleExport("pdf", type)} className="text-sm">
+                      {REPORT_LABELS[type]}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-2">
+                    <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+                    Exportar como Excel
+                  </DropdownMenuLabel>
+                  {REPORT_TYPES.map((type) => (
+                    <DropdownMenuItem key={`xls-${type}`} onClick={() => handleExport("xlsx", type)} className="text-sm">
+                      {REPORT_LABELS[type]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogTrigger asChild>
                   <Button type="button" className="gap-2 shadow-sm">

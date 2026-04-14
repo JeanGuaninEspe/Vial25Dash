@@ -27,6 +27,11 @@ function getCookieValue(cookieHeader: string | null, key: string) {
 }
 
 export const onRequest = defineMiddleware(async ({ url, request }, next) => {
+  // Skip all auth checks in local development
+  if (import.meta.env.DEV) {
+    return next()
+  }
+
   const { pathname } = url
 
   if (

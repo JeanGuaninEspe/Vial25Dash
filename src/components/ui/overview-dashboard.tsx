@@ -17,12 +17,14 @@ import {
   RefreshCw,
   ChevronRight,
   Info,
+  Filter,
 } from "lucide-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
@@ -74,6 +76,8 @@ export function OverviewDashboard() {
   const [refreshing, setRefreshing] = React.useState(false)
   const [lastUpdate, setLastUpdate] = React.useState<Date>(new Date())
   const [liveSeedCounts, setLiveSeedCounts] = React.useState<Record<string, number>>({})
+  const [peajeFilter, setPeajeFilter] = React.useState<"all" | "CONGOMA" | "LOS_ANGELES">("all")
+  const [rawRecaudacionByPeaje, setRawRecaudacionByPeaje] = React.useState<Map<string, { congoma: number; losAngeles: number }>>(new Map())
 
   // Data States
   const [metrics, setMetrics] = React.useState<MetricsState>({
@@ -130,6 +134,7 @@ export function OverviewDashboard() {
       let recAyerTotal = 0
       let recAnteayerTotal = 0
       let recSemanaTotal = 0
+      const recByPeaje = new Map<string, { congoma: number; losAngeles: number }>()
 
       try {
         const resRec = await apiFetch(`${BASE_URL}${RECAUDACION_DIARIO_ENDPOINT}?${paramsRecaudacion.toString()}`)
@@ -142,8 +147,12 @@ export function OverviewDashboard() {
           agg.forEach((item: any) => {
             if (item && item.fecha) {
               const normalDate = String(item.fecha).includes("T") ? String(item.fecha).split("T")[0] : String(item.fecha)
-              const totalDelDia = (Number(item.congoma) || 0) + (Number(item.losAngeles) || 0)
+              const cVal = Number(item.congoma) || 0
+              const lVal = Number(item.losAngeles) || 0
+              const totalDelDia = cVal + lVal
               recByDate.set(normalDate.trim(), (recByDate.get(normalDate.trim()) || 0) + totalDelDia)
+              const existing = recByPeaje.get(normalDate.trim()) ?? { congoma: 0, losAngeles: 0 }
+              recByPeaje.set(normalDate.trim(), { congoma: existing.congoma + cVal, losAngeles: existing.losAngeles + lVal })
             }
           })
 
@@ -303,6 +312,7 @@ export function OverviewDashboard() {
 
       setTrafficChartData(transitoData)
       setRevenueChartData(revChart)
+      setRawRecaudacionByPeaje(recByPeaje)
 
       // Generate alerts
       const bestDay = [...transitoData].sort((a, b) => b.total - a.total)[0]
@@ -351,6 +361,7 @@ export function OverviewDashboard() {
 
   React.useEffect(() => {
     if (typeof liveTotal !== "number") return
+    if (peajeFilter !== "all") return // live updates only apply to combined view
 
     setMetrics((prev) => {
       if (prev.transitoHoy === liveTotal) return prev
@@ -369,7 +380,59 @@ export function OverviewDashboard() {
     if (liveUpdatedAt) {
       setLastUpdate(liveUpdatedAt)
     }
-  }, [liveTotal, liveUpdatedAt])
+  }, [liveTotal, liveUpdatedAt, peajeFilter])
+
+  // ----- Derived display values (respect peajeFilter) -----
+  const displayRevenueChartData = React.useMemo(() => {
+    if (peajeFilter === "all") return revenueChartData
+    const isCongoma = peajeFilter === "CONGOMA"
+    return revenueChartData.map((d) => {
+      const bp = rawRecaudacionByPeaje.get(String(d.date ?? "").trim())
+      return { ...d, total: bp ? (isCongoma ? bp.congoma : bp.losAngeles) : 0 }
+    })
+  }, [peajeFilter, revenueChartData, rawRecaudacionByPeaje])
+
+  const displayMetrics = React.useMemo((): MetricsState => {
+    if (peajeFilter === "all") return metrics
+    const isCongoma = peajeFilter === "CONGOMA"
+    const len = trafficChartData.length
+    const hoyEntry = len >= 1 ? trafficChartData[len - 1] : null
+    const ayerEntry = len >= 2 ? trafficChartData[len - 2] : null
+    const anteayerEntry = len >= 3 ? trafficChartData[len - 3] : null
+    const transitoHoyFiltered = hoyEntry
+      ? (isCongoma ? hoyEntry.congoma : hoyEntry.losAngeles)
+      : (isCongoma ? (liveSeedCounts["CONGOMA"] ?? 0) : (liveSeedCounts["LOS ANGELES"] ?? 0))
+    const vehiculosAyer = ayerEntry ? (isCongoma ? ayerEntry.congoma : ayerEntry.losAngeles) : 0
+    const vehiculosAnteayer = anteayerEntry ? (isCongoma ? anteayerEntry.congoma : anteayerEntry.losAngeles) : 0
+    const transitoVar = vehiculosAyer > 0 ? ((transitoHoyFiltered - vehiculosAyer) / vehiculosAyer) * 100 : 0
+    const vehiculosVar = vehiculosAnteayer > 0 ? ((vehiculosAyer - vehiculosAnteayer) / vehiculosAnteayer) * 100 : 0
+    const field = isCongoma ? "congoma" : "losAngeles"
+    const recAyer = ayerEntry ? (rawRecaudacionByPeaje.get(ayerEntry.date)?.[field] ?? 0) : 0
+    const recAnteayer = anteayerEntry ? (rawRecaudacionByPeaje.get(anteayerEntry.date)?.[field] ?? 0) : 0
+    const recVar = recAnteayer > 0 ? ((recAyer - recAnteayer) / recAnteayer) * 100 : 0
+    let recSemana = 0
+    revenueChartData.forEach((d) => {
+      const bp = rawRecaudacionByPeaje.get(String(d.date ?? "").trim())
+      if (bp) recSemana += isCongoma ? bp.congoma : bp.losAngeles
+    })
+    const promedioHora = Math.floor(transitoHoyFiltered / Math.max(new Date().getHours(), 1))
+    return {
+      ...metrics,
+      transitoHoy: transitoHoyFiltered,
+      transitoVar,
+      tpdaEstimado: Math.floor(transitoHoyFiltered * 1.15),
+      tpdaVar: transitoVar,
+      vehiculosAyer,
+      vehiculosAnteayer,
+      vehiculosVar,
+      recaudacionAyer: recAyer,
+      recaudacionAnteayer: recAnteayer,
+      recaudacionVar: recVar,
+      recaudacionSemana: recSemana,
+      promedioHora,
+      peajeMayorFlujo: isCongoma ? "Cóngoma" : "Los Ángeles",
+    }
+  }, [peajeFilter, metrics, trafficChartData, rawRecaudacionByPeaje, revenueChartData, liveSeedCounts])
 
   // Animation Variants
   const containerVariants: Variants = {
@@ -407,16 +470,34 @@ export function OverviewDashboard() {
             <span>Última actualización: {format(lastUpdate, "hh:mm a", { locale: es })}</span>
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchDashboardData(true)}
-          disabled={refreshing}
-          className="w-fit gap-2 transition-all"
-        >
-          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} aria-hidden="true" />
-          {refreshing ? "Actualizando..." : "Actualizar"}
-        </Button>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Filter className="h-3 w-3" aria-hidden="true" />
+              Peaje
+            </span>
+            <Select value={peajeFilter} onValueChange={(v) => setPeajeFilter(v as "all" | "CONGOMA" | "LOS_ANGELES")}>
+              <SelectTrigger className="h-9 w-[160px] text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Ambos Peajes</SelectItem>
+                <SelectItem value="CONGOMA">Cóngoma</SelectItem>
+                <SelectItem value="LOS_ANGELES">Los Ángeles</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            className="w-fit gap-2 transition-all h-9"
+          >
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} aria-hidden="true" />
+            {refreshing ? "Actualizando..." : "Actualizar"}
+          </Button>
+        </div>
       </motion.header>
 
       {/* Section: Métricas Principales */}
@@ -431,26 +512,26 @@ export function OverviewDashboard() {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Tránsito Hoy"
-            value={numberFormatter.format(metrics.transitoHoy)}
-            variation={metrics.transitoVar}
+            value={numberFormatter.format(displayMetrics.transitoHoy)}
+            variation={displayMetrics.transitoVar}
             icon={Car}
-            badge="En vivo"
-            badgeVariant="live"
-            description={`~${numberFormatter.format(metrics.promedioHora)} veh/hora promedio`}
+            badge={peajeFilter === "all" ? "En vivo" : peajeFilter === "CONGOMA" ? "Cóngoma" : "Los Ángeles"}
+            badgeVariant={peajeFilter === "all" ? "live" : "default"}
+            description={`~${numberFormatter.format(displayMetrics.promedioHora)} veh/hora promedio`}
             tooltipText="Total de vehículos que han cruzado hoy hasta el momento"
           />
           <MetricCard
             title="TPDA Estimado"
-            value={numberFormatter.format(metrics.tpdaEstimado)}
-            variation={metrics.tpdaVar}
+            value={numberFormatter.format(displayMetrics.tpdaEstimado)}
+            variation={displayMetrics.tpdaVar}
             icon={Activity}
             description="vs ayer"
             tooltipText="Tráfico Promedio Diario Anual proyectado para hoy"
           />
           <MetricCard
             title="Recaudación Ayer"
-            value={amountFormatter.format(metrics.recaudacionAyer)}
-            variation={metrics.recaudacionVar}
+            value={amountFormatter.format(displayMetrics.recaudacionAyer)}
+            variation={displayMetrics.recaudacionVar}
             icon={Banknote}
             highlight="emerald"
             badge={dates.ayerStr}
@@ -459,8 +540,8 @@ export function OverviewDashboard() {
           />
           <MetricCard
             title="Vehículos Contabilizados"
-            value={numberFormatter.format(metrics.vehiculosAyer)}
-            variation={metrics.vehiculosVar}
+            value={numberFormatter.format(displayMetrics.vehiculosAyer)}
+            variation={displayMetrics.vehiculosVar}
             icon={CreditCard}
             badge={dates.ayerStr}
             description="vs anteayer"
@@ -496,16 +577,18 @@ export function OverviewDashboard() {
                       <AlertRow key={`${alert.title}-${i}`} alert={alert} index={i} />
                     ))}
                   </AnimatePresence>
-                  <AlertRow
-                    alert={{
-                      type: "info",
-                      title: "Peaje de Mayor Flujo",
-                      desc: `${metrics.peajeMayorFlujo} lidera el tráfico actual.`,
-                      icon: ArrowUpRight,
-                    }}
-                    index={alerts.length}
-                    highlight
-                  />
+                  {peajeFilter === "all" && (
+                    <AlertRow
+                      alert={{
+                        type: "info",
+                        title: "Peaje de Mayor Flujo",
+                        desc: `${metrics.peajeMayorFlujo} lidera el tráfico actual.`,
+                        icon: ArrowUpRight,
+                      }}
+                      index={alerts.length}
+                      highlight
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -523,7 +606,7 @@ export function OverviewDashboard() {
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">
-                    <RollingNumber value={amountFormatter.format(metrics.recaudacionSemana)} />
+                    <RollingNumber value={amountFormatter.format(displayMetrics.recaudacionSemana)} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1.5">
                     Total de los últimos 7 días
@@ -576,6 +659,7 @@ export function OverviewDashboard() {
               icon={Activity}
               data={trafficChartData}
               type="traffic"
+              peajeFilter={peajeFilter}
             />
           </motion.div>
 
@@ -585,8 +669,9 @@ export function OverviewDashboard() {
               description="Evolución de ingresos en los últimos 7 días"
               icon={Banknote}
               iconColor="emerald"
-              data={revenueChartData}
+              data={displayRevenueChartData}
               type="revenue"
+              peajeFilter={peajeFilter}
             />
           </motion.div>
         </div>
@@ -831,9 +916,10 @@ interface ChartCardProps {
   iconColor?: "emerald"
   data: any[]
   type: "traffic" | "revenue"
+  peajeFilter?: "all" | "CONGOMA" | "LOS_ANGELES"
 }
 
-function ChartCard({ title, description, icon: Icon, iconColor, data, type }: ChartCardProps) {
+function ChartCard({ title, description, icon: Icon, iconColor, data, type, peajeFilter = "all" }: ChartCardProps) {
   return (
     <Card className="h-full border-border/60 shadow-sm overflow-hidden flex flex-col">
       <CardHeader className="pb-4 border-b border-border/40">
@@ -908,8 +994,12 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type }: Ch
                   iconSize={8}
                   wrapperStyle={{ fontSize: '12px' }}
                 />
-                <Area type="monotone" dataKey="congoma" name="Cóngoma" stroke="var(--chart-1)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCongoma)" />
-                <Area type="monotone" dataKey="losAngeles" name="Los Angeles" stroke="var(--chart-2)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLosAngeles)" />
+                {peajeFilter !== "LOS_ANGELES" && (
+                  <Area type="monotone" dataKey="congoma" name="Cóngoma" stroke="var(--chart-1)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCongoma)" />
+                )}
+                {peajeFilter !== "CONGOMA" && (
+                  <Area type="monotone" dataKey="losAngeles" name="Los Angeles" stroke="var(--chart-2)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLosAngeles)" />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           ) : (
