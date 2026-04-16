@@ -627,7 +627,7 @@ export function DescuentosRfidAdmin() {
         oficioAutorizacionNegacion: toNullable(createForm.oficioAutorizacionNegacion),
         fechaAutorizacionNegacion: resolvedFechaAut,
         vigencia: resolvedVigencia,
-        fechaVencimientoReal: resolvedFechaVencimientoReal,
+        ...(resolvedFechaVencimientoReal ? { fechaVencimientoReal: resolvedFechaVencimientoReal } : {}),
         observacion: toNullable(createForm.observacion),
       }
 
@@ -765,7 +765,7 @@ export function DescuentosRfidAdmin() {
         oficioAutorizacionNegacion: toNullable(editForm.oficioAutorizacionNegacion),
         fechaAutorizacionNegacion: resolvedFechaAut,
         vigencia: resolvedVigencia,
-        fechaVencimientoReal: resolvedFechaVencimientoReal,
+        ...(resolvedFechaVencimientoReal ? { fechaVencimientoReal: resolvedFechaVencimientoReal } : {}),
         observacion: toNullable(editForm.observacion),
         correo: toNullable(editForm.correo),
         telefono: toNullable(editForm.telefono),
