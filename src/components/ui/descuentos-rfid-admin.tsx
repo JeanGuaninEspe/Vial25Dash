@@ -181,6 +181,52 @@ function formatPickerDate(date: Date | undefined) {
   return date.toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
+function getRfidDateValidationError(
+  autorizacionUpper: string,
+  fechaStr: string | null,
+  fechaAutStr: string | null,
+  vigenciaStr: string | null,
+) {
+  if (!fechaStr) {
+    return "La fecha de ingreso es obligatoria."
+  }
+
+  if (autorizacionUpper !== "PENDIENTE" && !fechaAutStr) {
+    return "La fecha de autorizacion / negacion es obligatoria para este estado."
+  }
+
+  if (autorizacionUpper === "APROBADO" && !vigenciaStr) {
+    return "La fecha de vigencia final es obligatoria para registros aprobados."
+  }
+
+  return null
+}
+
+function resolveRfidDates(
+  autorizacionUpper: string,
+  fechaStr: string | null,
+  fechaAutStr: string | null,
+  vigenciaStr: string | null,
+) {
+  const resolvedFechaAut = autorizacionUpper === "PENDIENTE" ? fechaStr : fechaAutStr
+  const resolvedVigencia = autorizacionUpper === "PENDIENTE"
+    ? fechaStr
+    : autorizacionUpper === "NEGADO"
+      ? (vigenciaStr || fechaAutStr)
+      : vigenciaStr
+  const resolvedFechaVencimientoReal = autorizacionUpper === "PENDIENTE"
+    ? fechaStr
+    : autorizacionUpper === "NEGADO"
+      ? fechaAutStr
+      : resolvedVigencia
+
+  return {
+    resolvedFechaAut,
+    resolvedVigencia,
+    resolvedFechaVencimientoReal,
+  }
+}
+
 function DatePickerField({
   label,
   date,
@@ -597,23 +643,30 @@ export function DescuentosRfidAdmin() {
       return
     }
 
+    const autorizacionUpper = (createForm.autorizacion || "").toUpperCase()
+    const fechaStr = fechaDate ? fechaDate.toISOString().split("T")[0] : null
+    const fechaAutStr = fechaAutDate ? fechaAutDate.toISOString().split("T")[0] : null
+    const vigenciaStr = vigenciaDate ? vigenciaDate.toISOString().split("T")[0] : null
+    const validationError = getRfidDateValidationError(
+      autorizacionUpper,
+      fechaStr,
+      fechaAutStr,
+      vigenciaStr,
+    )
+
+    if (validationError) {
+      setCreateError(validationError)
+      return
+    }
+
     setCreating(true)
 
     try {
-      const autorizacionUpper = (createForm.autorizacion || "").toUpperCase()
-      const fechaStr = fechaDate ? fechaDate.toISOString().split("T")[0] : null
-      const fechaAutStr = fechaAutDate ? fechaAutDate.toISOString().split("T")[0] : null
-      const vigenciaStr = vigenciaDate ? vigenciaDate.toISOString().split("T")[0] : null
-
-      // Derive computed dates based on authorization status
-      const resolvedFechaAut =
-        autorizacionUpper === "PENDIENTE" ? fechaStr : fechaAutStr
-      const resolvedVigencia =
-        autorizacionUpper === "PENDIENTE" ? null : vigenciaStr
-      const resolvedFechaVencimientoReal =
-        autorizacionUpper === "PENDIENTE" ? fechaStr
-        : autorizacionUpper === "NEGADO" ? fechaAutStr
-        : vigenciaStr
+      const {
+        resolvedFechaAut,
+        resolvedVigencia,
+        resolvedFechaVencimientoReal,
+      } = resolveRfidDates(autorizacionUpper, fechaStr, fechaAutStr, vigenciaStr)
 
       const payload = {
         apellidosYNombres: toNullable(createForm.apellidosYNombres),
@@ -737,21 +790,29 @@ export function DescuentosRfidAdmin() {
     event.preventDefault()
     if (!editRow) return
     setEditError(null)
+    const autorizacionUpper = (editForm.autorizacion || "").toUpperCase()
+    const fechaStr = editFechaDate ? editFechaDate.toISOString().split("T")[0] : null
+    const fechaAutStr = editFechaAutDate ? editFechaAutDate.toISOString().split("T")[0] : null
+    const vigenciaStr = editVigenciaDate ? editVigenciaDate.toISOString().split("T")[0] : null
+    const validationError = getRfidDateValidationError(
+      autorizacionUpper,
+      fechaStr,
+      fechaAutStr,
+      vigenciaStr,
+    )
+
+    if (validationError) {
+      setEditError(validationError)
+      return
+    }
+
     setUpdating(true)
     try {
-      const autorizacionUpper = (editForm.autorizacion || "").toUpperCase()
-      const fechaStr = editFechaDate ? editFechaDate.toISOString().split("T")[0] : null
-      const fechaAutStr = editFechaAutDate ? editFechaAutDate.toISOString().split("T")[0] : null
-      const vigenciaStr = editVigenciaDate ? editVigenciaDate.toISOString().split("T")[0] : null
-
-      const resolvedFechaAut =
-        autorizacionUpper === "PENDIENTE" ? fechaStr : fechaAutStr
-      const resolvedVigencia =
-        autorizacionUpper === "PENDIENTE" ? null : vigenciaStr
-      const resolvedFechaVencimientoReal =
-        autorizacionUpper === "PENDIENTE" ? fechaStr
-        : autorizacionUpper === "NEGADO" ? fechaAutStr
-        : vigenciaStr
+      const {
+        resolvedFechaAut,
+        resolvedVigencia,
+        resolvedFechaVencimientoReal,
+      } = resolveRfidDates(autorizacionUpper, fechaStr, fechaAutStr, vigenciaStr)
 
       const payload = {
         apellidosYNombres: toNullable(editForm.apellidosYNombres),
