@@ -600,18 +600,34 @@ export function DescuentosRfidAdmin() {
     setCreating(true)
 
     try {
+      const autorizacionUpper = (createForm.autorizacion || "").toUpperCase()
+      const fechaStr = fechaDate ? fechaDate.toISOString().split("T")[0] : null
+      const fechaAutStr = fechaAutDate ? fechaAutDate.toISOString().split("T")[0] : null
+      const vigenciaStr = vigenciaDate ? vigenciaDate.toISOString().split("T")[0] : null
+
+      // Derive computed dates based on authorization status
+      const resolvedFechaAut =
+        autorizacionUpper === "PENDIENTE" ? fechaStr : fechaAutStr
+      const resolvedVigencia =
+        autorizacionUpper === "PENDIENTE" ? null : vigenciaStr
+      const resolvedFechaVencimientoReal =
+        autorizacionUpper === "PENDIENTE" ? fechaStr
+        : autorizacionUpper === "NEGADO" ? fechaAutStr
+        : vigenciaStr
+
       const payload = {
         apellidosYNombres: toNullable(createForm.apellidosYNombres),
         cedulaORuc: toNullable(createForm.cedulaORuc),
         placa: toNullable(createForm.placa),
         documentoIngreso: toNullable(createForm.documentoIngreso),
-        fecha: fechaDate ? fechaDate.toISOString().split("T")[0] : null,
+        fecha: fechaStr,
         asunto: toNullable(createForm.asunto),
         peaje: toNullable(createForm.peaje),
         autorizacion: toNullable(createForm.autorizacion),
         oficioAutorizacionNegacion: toNullable(createForm.oficioAutorizacionNegacion),
-        fechaAutorizacionNegacion: fechaAutDate ? fechaAutDate.toISOString().split("T")[0] : null,
-        vigencia: vigenciaDate ? vigenciaDate.toISOString().split("T")[0] : null,
+        fechaAutorizacionNegacion: resolvedFechaAut,
+        vigencia: resolvedVigencia,
+        fechaVencimientoReal: resolvedFechaVencimientoReal,
         observacion: toNullable(createForm.observacion),
       }
 
@@ -723,18 +739,33 @@ export function DescuentosRfidAdmin() {
     setEditError(null)
     setUpdating(true)
     try {
+      const autorizacionUpper = (editForm.autorizacion || "").toUpperCase()
+      const fechaStr = editFechaDate ? editFechaDate.toISOString().split("T")[0] : null
+      const fechaAutStr = editFechaAutDate ? editFechaAutDate.toISOString().split("T")[0] : null
+      const vigenciaStr = editVigenciaDate ? editVigenciaDate.toISOString().split("T")[0] : null
+
+      const resolvedFechaAut =
+        autorizacionUpper === "PENDIENTE" ? fechaStr : fechaAutStr
+      const resolvedVigencia =
+        autorizacionUpper === "PENDIENTE" ? null : vigenciaStr
+      const resolvedFechaVencimientoReal =
+        autorizacionUpper === "PENDIENTE" ? fechaStr
+        : autorizacionUpper === "NEGADO" ? fechaAutStr
+        : vigenciaStr
+
       const payload = {
         apellidosYNombres: toNullable(editForm.apellidosYNombres),
         cedulaORuc: toNullable(editForm.cedulaORuc),
         placa: toNullable(editForm.placa),
         documentoIngreso: toNullable(editForm.documentoIngreso),
-        fecha: editFechaDate ? editFechaDate.toISOString().split("T")[0] : null,
+        fecha: fechaStr,
         asunto: toNullable(editForm.asunto),
         peaje: toNullable(editForm.peaje),
         autorizacion: toNullable(editForm.autorizacion),
         oficioAutorizacionNegacion: toNullable(editForm.oficioAutorizacionNegacion),
-        fechaAutorizacionNegacion: editFechaAutDate ? editFechaAutDate.toISOString().split("T")[0] : null,
-        vigencia: editVigenciaDate ? editVigenciaDate.toISOString().split("T")[0] : null,
+        fechaAutorizacionNegacion: resolvedFechaAut,
+        vigencia: resolvedVigencia,
+        fechaVencimientoReal: resolvedFechaVencimientoReal,
         observacion: toNullable(editForm.observacion),
         correo: toNullable(editForm.correo),
         telefono: toNullable(editForm.telefono),
@@ -1123,13 +1154,15 @@ export function DescuentosRfidAdmin() {
                           className="bg-background"
                         />
                       </div>
-                      <DatePickerField
-                        label="Fecha de autorizacion / negacion"
-                        date={fechaAutDate}
-                        onSelect={setFechaAutDate}
-                        open={fechaAutOpen}
-                        onOpenChange={setFechaAutOpen}
-                      />
+                      {createForm.autorizacion !== "PENDIENTE" && (
+                        <DatePickerField
+                          label="Fecha de autorizacion / negacion"
+                          date={fechaAutDate}
+                          onSelect={setFechaAutDate}
+                          open={fechaAutOpen}
+                          onOpenChange={setFechaAutOpen}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -1139,13 +1172,19 @@ export function DescuentosRfidAdmin() {
                       <p className="text-xs font-bold uppercase tracking-widest text-primary/80">
                         4. Vigencia
                       </p>
-                      <DatePickerField
-                        label="Fecha de vigencia final"
-                        date={vigenciaDate}
-                        onSelect={setVigenciaDate}
-                        open={vigenciaOpen}
-                        onOpenChange={setVigenciaOpen}
-                      />
+                      {createForm.autorizacion === "PENDIENTE" ? (
+                        <p className="text-xs text-muted-foreground">
+                          Se asignará automáticamente la fecha de ingreso.
+                        </p>
+                      ) : (
+                        <DatePickerField
+                          label="Fecha de vigencia final"
+                          date={vigenciaDate}
+                          onSelect={setVigenciaDate}
+                          open={vigenciaOpen}
+                          onOpenChange={setVigenciaOpen}
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-4 rounded-xl border border-border/40 bg-muted/20 p-5 shadow-sm">
@@ -1631,14 +1670,22 @@ export function DescuentosRfidAdmin() {
                   <Label htmlFor="edit-oficio">Oficio (aut/neg)</Label>
                   <Input id="edit-oficio" className="bg-background" value={editForm.oficioAutorizacionNegacion} onChange={(e) => handleEditFieldChange("oficioAutorizacionNegacion", e.target.value)} />
                 </div>
-                <DatePickerField label="Fecha de resolución" date={editFechaAutDate} onSelect={setEditFechaAutDate} open={editFechaAutOpen} onOpenChange={setEditFechaAutOpen} />
+                {editForm.autorizacion !== "PENDIENTE" && (
+                  <DatePickerField label="Fecha de resolución" date={editFechaAutDate} onSelect={setEditFechaAutDate} open={editFechaAutOpen} onOpenChange={setEditFechaAutOpen} />
+                )}
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-4 rounded-xl border border-border/40 bg-muted/20 p-5 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary/80">5. Vigencia</p>
-                <DatePickerField label="Fecha de vigencia final" date={editVigenciaDate} onSelect={setEditVigenciaDate} open={editVigenciaOpen} onOpenChange={setEditVigenciaOpen} />
+                {editForm.autorizacion === "PENDIENTE" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Se asignará automáticamente la fecha de ingreso.
+                  </p>
+                ) : (
+                  <DatePickerField label="Fecha de vigencia final" date={editVigenciaDate} onSelect={setEditVigenciaDate} open={editVigenciaOpen} onOpenChange={setEditVigenciaOpen} />
+                )}
               </div>
               <div className="space-y-4 rounded-xl border border-border/40 bg-muted/20 p-5 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary/80">6. Notas finales</p>
