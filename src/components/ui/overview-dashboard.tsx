@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { motion, type Variants, AnimatePresence } from "framer-motion"
-import { format, subDays } from "date-fns"
+import { format, subDays, startOfWeek, endOfWeek, subWeeks, isSameWeek } from "date-fns"
 import { es } from "date-fns/locale"
 import {
   Activity,
@@ -119,15 +119,22 @@ export function OverviewDashboard() {
       const dateStrAyer = format(subDays(today, 1), "yyyy-MM-dd")
       const dateStrAnteayer = format(subDays(today, 2), "yyyy-MM-dd")
       const sieteDiasAtras = format(subDays(today, 7), "yyyy-MM-dd")
+      
+      const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+      const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+      const lastWeekStartStr = format(lastWeekStart, "yyyy-MM-dd")
+      
+      // Aseguramos pedir datos suficientes para incluir toda la semana pasada
+      const desdeFetch = new Date(sieteDiasAtras) < lastWeekStart ? sieteDiasAtras : lastWeekStartStr
 
       setDates({
         hoyStr: format(today, "dd MMM yyyy", { locale: es }),
         ayerStr: format(subDays(today, 1), "dd MMM yyyy", { locale: es }),
       })
 
-      // 1. Fetch Recaudacion Diario (últimos 7 días)
+      // 1. Fetch Recaudacion Diario (últimos 7 días + semana pasada)
       const paramsRecaudacion = new URLSearchParams()
-      paramsRecaudacion.append("desde", sieteDiasAtras)
+      paramsRecaudacion.append("desde", desdeFetch)
       paramsRecaudacion.append("hasta", dateStrHoy)
 
       let revChart: any[] = []
@@ -164,8 +171,15 @@ export function OverviewDashboard() {
             const d = format(subDays(today, i), "yyyy-MM-dd")
             const val = recByDate.get(d) || 0
             revChart.push({ date: d, total: val })
-            recSemanaTotal += val
           }
+          
+          // Calculamos total solo de la semana completa anterior
+          recByDate.forEach((val, dateStr) => {
+            const date = new Date(dateStr + "T12:00:00")
+            if (date >= lastWeekStart && date <= lastWeekEnd) {
+              recSemanaTotal += val
+            }
+          })
         } else {
           throw new Error("Recaudacion Response Not OK")
         }
@@ -179,19 +193,19 @@ export function OverviewDashboard() {
           const d = format(subDays(today, i), "yyyy-MM-dd")
           const val = Math.random() * 5000 + 6000
           revChart.push({ date: d, total: val })
-          recSemanaTotal += val
         }
+        recSemanaTotal = Math.random() * 35000 + 40000;
       }
 
-      // 2. Fetch Tráfico (Últimos 7 días)
+      // 2. Fetch Tráfico (Últimos 7 días + semana pasada)
       let transitoData: any[] = []
       let trHoyC = 0, trHoyL = 0
       let trAyerC = 0, trAyerL = 0
       let trAnteayerC = 0, trAnteayerL = 0
 
       try {
-        const paramsTransito1 = new URLSearchParams({ desde: sieteDiasAtras, hasta: dateStrHoy, nombrePeaje: "CONGOMA" })
-        const paramsTransito2 = new URLSearchParams({ desde: sieteDiasAtras, hasta: dateStrHoy, nombrePeaje: "LOS ANGELES" })
+        const paramsTransito1 = new URLSearchParams({ desde: desdeFetch, hasta: dateStrHoy, nombrePeaje: "CONGOMA" })
+        const paramsTransito2 = new URLSearchParams({ desde: desdeFetch, hasta: dateStrHoy, nombrePeaje: "LOS ANGELES" })
 
         const [resT1, resT2] = await Promise.all([
           apiFetch(`${BASE_URL}${TRANSITO_ENDPOINT}?${paramsTransito1.toString()}`),
@@ -518,15 +532,16 @@ export function OverviewDashboard() {
             badge={peajeFilter === "all" ? "En vivo" : peajeFilter === "CONGOMA" ? "Cóngoma" : "Los Ángeles"}
             badgeVariant={peajeFilter === "all" ? "live" : "default"}
             description={`~${numberFormatter.format(displayMetrics.promedioHora)} veh/hora promedio`}
-            tooltipText="Total de vehículos que han cruzado hoy hasta el momento"
+            tooltipText={`Hoy: ${numberFormatter.format(displayMetrics.transitoHoy)} | Ayer: ${numberFormatter.format(displayMetrics.vehiculosAyer)}`}
           />
           <MetricCard
-            title="TPDA Estimado"
-            value={numberFormatter.format(displayMetrics.tpdaEstimado)}
-            variation={displayMetrics.tpdaVar}
-            icon={Activity}
-            description="vs ayer"
-            tooltipText="Tráfico Promedio Diario Anual proyectado para hoy"
+            title="Vehículos Ayer"
+            value={numberFormatter.format(displayMetrics.vehiculosAyer)}
+            variation={displayMetrics.vehiculosVar}
+            icon={CreditCard}
+            badge={dates.ayerStr}
+            description="Cerrado"
+            tooltipText={`Ayer: ${numberFormatter.format(displayMetrics.vehiculosAyer)} | Anteayer: ${numberFormatter.format(displayMetrics.vehiculosAnteayer)}`}
           />
           <MetricCard
             title="Recaudación Ayer"
@@ -535,17 +550,16 @@ export function OverviewDashboard() {
             icon={Banknote}
             highlight="emerald"
             badge={dates.ayerStr}
-            description="vs anteayer"
-            tooltipText="Total recaudado en el día anterior"
+            description="Ingresos consolidados"
+            tooltipText={`Ayer: ${amountFormatter.format(displayMetrics.recaudacionAyer)} | Anteayer: ${amountFormatter.format(displayMetrics.recaudacionAnteayer)}`}
           />
           <MetricCard
-            title="Vehículos Contabilizados"
-            value={numberFormatter.format(displayMetrics.vehiculosAyer)}
-            variation={displayMetrics.vehiculosVar}
-            icon={CreditCard}
-            badge={dates.ayerStr}
-            description="vs anteayer"
-            tooltipText="Total de vehículos procesados ayer"
+            title="TPDA Estimado"
+            value={numberFormatter.format(displayMetrics.tpdaEstimado)}
+            variation={displayMetrics.tpdaVar}
+            icon={Activity}
+            description="Proyección base"
+            tooltipText="Tráfico Promedio Diario Anual proyectado para hoy"
           />
         </div>
       </section>
@@ -571,7 +585,7 @@ export function OverviewDashboard() {
                 <CardDescription>Alertas y novedades importantes</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y divide-border/40">
+                <div className="divide-y divide-border/40 max-h-[310px] overflow-y-auto pr-1">
                   <AnimatePresence mode="popLayout">
                     {alerts.map((alert, i) => (
                       <AlertRow key={`${alert.title}-${i}`} alert={alert} index={i} />
@@ -601,16 +615,23 @@ export function OverviewDashboard() {
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <span className="text-sm font-medium text-muted-foreground">Acumulado Semanal</span>
+                    <Badge variant="secondary" className="text-[10px] uppercase font-semibold px-1.5 py-0.5">
+                      Semana Pasada
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-1 mb-1">
+                    <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">
+                      <RollingNumber value={amountFormatter.format(displayMetrics.recaudacionSemana)} />
+                    </div>
                     <div className="p-2 rounded-lg bg-emerald-500/10">
                       <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                     </div>
                   </div>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">
-                    <RollingNumber value={amountFormatter.format(displayMetrics.recaudacionSemana)} />
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/40">
+                    <p className="text-xs text-muted-foreground w-full">
+                      Lunes a Domingo (semana anterior)
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Total de los últimos 7 días
-                  </p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -726,10 +747,10 @@ function DashboardSkeleton() {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="border-border/60 shadow-sm p-5">
-              <div className="flex justify-between items-start mb-4">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-10 rounded-lg" />
-              </div>
+                  <div className="flex justify-between items-start mb-4">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                  </div>
               <Skeleton className="h-8 w-32 mb-2" />
               <Skeleton className="h-3 w-20" />
             </Card>
@@ -944,20 +965,24 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
       <CardContent className="pt-6 flex-1 min-h-[280px]">
         <div className="h-full w-full">
           {data.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground p-6 text-center border-2 border-dashed rounded-xl border-border/50">
-              No existen datos en este rango temporal
+            <div className="flex flex-col h-full items-center justify-center text-sm text-muted-foreground p-6 text-center border-2 border-dashed rounded-xl border-border/50">
+              <p className="mb-3">No existen datos en este rango temporal</p>
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                Reintentar
+              </Button>
             </div>
           ) : type === "traffic" ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCongoma" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.2} />
                   </linearGradient>
                   <linearGradient id="colorLosAngeles" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.2} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
@@ -976,14 +1001,16 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                   tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
                 />
                 <RechartsTooltip
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
                   contentStyle={{
                     borderRadius: '12px',
-                    borderColor: 'hsl(var(--border))',
+                    borderColor: 'hsl(border)',
                     backgroundColor: 'hsl(var(--card))',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    padding: '8px 12px'
                   }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 500 }}
-                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px', fontSize: '12px' }}
+                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                   labelFormatter={(val) => format(new Date(val + "T12:00:00"), "EEEE, dd MMM", { locale: es })}
                   formatter={(val: number) => [numberFormatter.format(val), ""]}
                 />
@@ -995,10 +1022,10 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                   wrapperStyle={{ fontSize: '12px' }}
                 />
                 {peajeFilter !== "LOS_ANGELES" && (
-                  <Area type="monotone" dataKey="congoma" name="Cóngoma" stroke="var(--chart-1)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCongoma)" />
+                  <Area type="monotone" dataKey="congoma" name="Cóngoma" stackId="1" stroke="var(--chart-1)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCongoma)" />
                 )}
                 {peajeFilter !== "CONGOMA" && (
-                  <Area type="monotone" dataKey="losAngeles" name="Los Angeles" stroke="var(--chart-2)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLosAngeles)" />
+                  <Area type="monotone" dataKey="losAngeles" name="Los Angeles" stackId="1" stroke="var(--chart-2)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLosAngeles)" />
                 )}
               </AreaChart>
             </ResponsiveContainer>
@@ -1027,14 +1054,16 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                   tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`}
                 />
                 <RechartsTooltip
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
                   contentStyle={{
                     borderRadius: '12px',
-                    borderColor: 'hsl(var(--border))',
+                    borderColor: 'hsl(border)',
                     backgroundColor: 'hsl(var(--card))',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    padding: '8px 12px'
                   }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 500 }}
-                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px', fontSize: '12px' }}
+                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                   labelFormatter={(val) => format(new Date(val + "T12:00:00"), "EEEE, dd MMM", { locale: es })}
                   formatter={(val: number) => [amountFormatter.format(val), ""]}
                 />

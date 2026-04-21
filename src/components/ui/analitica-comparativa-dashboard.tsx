@@ -2,7 +2,7 @@ import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { format, startOfMonth, endOfMonth, getDaysInMonth, subMonths, parse, startOfWeek, endOfWeek, subWeeks, subDays } from "date-fns"
 import { TrendingUp, TrendingDown, Banknote, Car, ArrowRightLeft, CreditCard, Activity } from "lucide-react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -189,44 +189,74 @@ export function AnaliticaComparativaDashboard() {
       const merged = []
       const maxDays = Math.max(daysA, daysB)
 
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      yesterday.setHours(23, 59, 59, 999)
+
+      // Variables para consolidar métricas equitativamente (Month-To-Date real)
+      let eqRecA = 0, eqRecB = 0, eqTrafA = 0, eqTrafB = 0;
+
       if (modo === "dia") {
-        // En diario simplemente renderizamos barras vs
-        merged.push({
-          label: "Recaudación Total",
-          recA: mapRecA.get(1) || 0,
-          recB: mapRecB.get(1) || 0,
-        })
-        merged.push({
-          label: "Tráfico Total",
-          trafA: mapTrafA.get(1) || 0,
-          trafB: mapTrafB.get(1) || 0,
-        })
+        eqRecA = mapRecA.get(1) || 0;
+        eqRecB = mapRecB.get(1) || 0;
+        eqTrafA = mapTrafA.get(1) || 0;
+        eqTrafB = mapTrafB.get(1) || 0;
+
+        merged.push({ label: "Recaudación Total", recA: eqRecA, recB: eqRecB })
+        merged.push({ label: "Tráfico Total", trafA: eqTrafA, trafB: eqTrafB })
       } else {
         for (let i = 1; i <= maxDays; i++) {
-          merged.push({
-            dayIndex: i,
-            label: labelFormatter(i),
-            recA: mapRecA.get(i) || 0,
-            recB: mapRecB.get(i) || 0,
-            trafA: mapTrafA.get(i) || 0,
-            trafB: mapTrafB.get(i) || 0,
-          })
+          let showA = true
+          let showB = true
+
+          // Omitir días futuros relativos a Ayer para evitar caídas abruptas a 0
+          let dateObjA = new Date(startA + "T12:00:00")
+          if (modo === "mes") dateObjA.setDate(i)
+          else if (modo === "semana") dateObjA.setDate(dateObjA.getDate() + (i - 1))
+          if (dateObjA > yesterday) showA = false
+
+          let dateObjB = new Date(startB + "T12:00:00")
+          if (modo === "mes") dateObjB.setDate(i)
+          else if (modo === "semana") dateObjB.setDate(dateObjB.getDate() + (i - 1))
+          if (dateObjB > yesterday) showB = false
+
+          // Si alguno de los dos periodos incluye un día futuro (ej: mes actual en curso),
+          // cortamos y rompemos el ciclo. Esto evita el gran espacio vacío al final del gráfico
+          // y recorta los datos a una comparación "To-Date" justa.
+          if (!showA || !showB) {
+            break;
+          }
+
+          let d: any = { dayIndex: i, label: labelFormatter(i) }
+          
+          d.recA = mapRecA.get(i) || 0
+          d.recB = mapRecB.get(i) || 0
+          d.trafA = mapTrafA.get(i) || 0
+          d.trafB = mapTrafB.get(i) || 0
+          
+          eqRecA += d.recA;
+          eqRecB += d.recB;
+          eqTrafA += d.trafA;
+          eqTrafB += d.trafB;
+
+          merged.push(d)
         }
       }
 
-      const tarifaA = totalTrafA > 0 ? totalRecA / totalTrafA : 0
-      const tarifaB = totalTrafB > 0 ? totalRecB / totalTrafB : 0
-      const promA = totalRecA / daysA
-      const promB = totalRecB / daysB
+      const eqDays = Math.max(modo === "dia" ? 1 : merged.length, 1);
+      const tarifaA = eqTrafA > 0 ? eqRecA / eqTrafA : 0
+      const tarifaB = eqTrafB > 0 ? eqRecB / eqTrafB : 0
+      const promA = eqRecA / eqDays
+      const promB = eqRecB / eqDays
 
       setChartData(merged)
       setMetrics({
-        recA: totalRecA,
-        recB: totalRecB,
-        deltaRec: totalRecB > 0 ? ((totalRecA - totalRecB) / totalRecB) * 100 : 0,
-        trafA: totalTrafA,
-        trafB: totalTrafB,
-        deltaTraf: totalTrafB > 0 ? ((totalTrafA - totalTrafB) / totalTrafB) * 100 : 0,
+        recA: eqRecA,
+        recB: eqRecB,
+        deltaRec: eqRecB > 0 ? ((eqRecA - eqRecB) / eqRecB) * 100 : 0,
+        trafA: eqTrafA,
+        trafB: eqTrafB,
+        deltaTraf: eqTrafB > 0 ? ((eqTrafA - eqTrafB) / eqTrafB) * 100 : 0,
         tarifaA, tarifaB,
         deltaTarifa: tarifaB > 0 ? ((tarifaA - tarifaB) / tarifaB) * 100 : 0,
         promA, promB,
@@ -420,11 +450,14 @@ export function AnaliticaComparativaDashboard() {
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`} />
                         <Tooltip
                           cursor={{ fill: 'currentColor', opacity: 0.05 }}
-                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
+                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(border)', backgroundColor: 'hsl(var(--card))', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                           formatter={(val: number, name: string) => [amountFormatter.format(val), name === 'recA' ? `Periodo A` : `Periodo B`]}
                         />
-                        <Bar dataKey="recB" name="recB" fill="hsl(var(--muted-foreground))" fillOpacity={0.2} radius={[4, 4, 0, 0]} maxBarSize={120} />
-                        <Bar dataKey="recA" name="recA" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={120} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px' }} />
+                        <Bar dataKey="recB" name="Periodo B" fill="#94a3b8" fillOpacity={0.4} radius={[4, 4, 0, 0]} maxBarSize={120} />
+                        <Bar dataKey="recA" name="Periodo A" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={120} />
                       </BarChart>
                     ) : (
                       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -438,11 +471,15 @@ export function AnaliticaComparativaDashboard() {
                         <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} dy={10} minTickGap={15} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`} />
                         <Tooltip
-                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
+                          cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
+                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(border)', backgroundColor: 'hsl(var(--card))', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                           formatter={(val: number, name: string) => [amountFormatter.format(val), name === 'recA' ? `Periodo A` : `Periodo B`]}
                         />
-                        <Area type="monotone" dataKey="recB" name="recB" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="5 5" fillOpacity={0} />
-                        <Area type="monotone" dataKey="recA" name="recA" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRecA)" activeDot={{ r: 6, fill: "#10b981", stroke: "#fff" }} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px' }} />
+                        <Area type="monotone" dataKey="recB" name="Periodo B" stroke="#94a3b8" strokeWidth={2.5} strokeDasharray="5 5" fillOpacity={0} connectNulls={false} />
+                        <Area type="monotone" dataKey="recA" name="Periodo A" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRecA)" activeDot={{ r: 6, fill: "#10b981", stroke: "#fff" }} connectNulls={false} />
                       </AreaChart>
                     )}
                   </ResponsiveContainer>
@@ -463,11 +500,14 @@ export function AnaliticaComparativaDashboard() {
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val} />
                         <Tooltip
                           cursor={{ fill: 'currentColor', opacity: 0.05 }}
-                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
+                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(border)', backgroundColor: 'hsl(var(--card))', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                           formatter={(val: number, name: string) => [numberFormatter.format(val), name === 'trafA' ? `Periodo A` : `Periodo B`]}
                         />
-                        <Bar dataKey="trafB" name="trafB" fill="hsl(var(--muted-foreground))" fillOpacity={0.2} radius={[4, 4, 0, 0]} maxBarSize={120} />
-                        <Bar dataKey="trafA" name="trafA" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={120} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px' }} />
+                        <Bar dataKey="trafB" name="Periodo B" fill="#94a3b8" fillOpacity={0.4} radius={[4, 4, 0, 0]} maxBarSize={120} />
+                        <Bar dataKey="trafA" name="Periodo A" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={120} />
                       </BarChart>
                     ) : (
                       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -481,11 +521,15 @@ export function AnaliticaComparativaDashboard() {
                         <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} dy={10} minTickGap={15} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }} tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val} />
                         <Tooltip
-                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
+                          cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
+                          contentStyle={{ borderRadius: '12px', borderColor: 'hsl(border)', backgroundColor: 'hsl(var(--card))', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
                           formatter={(val: number, name: string) => [numberFormatter.format(val), name === 'trafA' ? `Periodo A` : `Periodo B`]}
                         />
-                        <Area type="monotone" dataKey="trafB" name="trafB" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="5 5" fillOpacity={0} />
-                        <Area type="monotone" dataKey="trafA" name="trafA" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTrafA)" activeDot={{ r: 6, fill: "#3b82f6", stroke: "#fff" }} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px' }} />
+                        <Area type="monotone" dataKey="trafB" name="Periodo B" stroke="#94a3b8" strokeWidth={2.5} strokeDasharray="5 5" fillOpacity={0} connectNulls={false} />
+                        <Area type="monotone" dataKey="trafA" name="Periodo A" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTrafA)" activeDot={{ r: 6, fill: "#3b82f6", stroke: "#fff" }} connectNulls={false} />
                       </AreaChart>
                     )}
                   </ResponsiveContainer>

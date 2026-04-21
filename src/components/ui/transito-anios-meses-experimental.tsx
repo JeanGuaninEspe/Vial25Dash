@@ -1,11 +1,12 @@
 import * as React from "react"
 import { motion, type Variants } from "framer-motion"
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
-import { Activity, BarChart3, TrendingUp } from "lucide-react"
+import { Activity, BarChart3, RefreshCw, TrendingUp } from "lucide-react"
 
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api"
 import { TrendText, generateMockVariation } from "@/components/ui/trend-text"
 
@@ -234,7 +236,7 @@ export function TransitoAniosMesesExperimental() {
     return config
   }, [anios])
 
-  const reportTitle = idPeaje === "1" ? "PEAJE CÓNGOMA" : "PEAJE LOS ANGELES"
+  const reportTitle = idPeaje === "1" ? "PEAJE CONGOMA" : "PEAJE LOS ANGELES"
 
   const kpi = React.useMemo(() => {
     const total = totalGeneral
@@ -254,10 +256,9 @@ export function TransitoAniosMesesExperimental() {
       { year: "-", value: 0 }
     )
 
-    // Variación del mejor año respecto al promedio
     const variationMaxVsAvg = avgYear > 0 ? ((maxYearEntry.value - avgYear) / avgYear) * 100 : 0
 
-    // Variación de nuestro último año vs el promedio general
+    // Variacion de nuestro ultimo ano vs el promedio general
     const variationLatestVsAvg = avgYear > 0 ? ((latestYearTotal - avgYear) / avgYear) * 100 : 0
 
     return {
@@ -296,7 +297,7 @@ export function TransitoAniosMesesExperimental() {
       opacity: 1,
       y: 0,
       transition: {
-        delay: index * 0.01,
+        delay: index * 0.015,
         duration: 0.2,
         ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
       },
@@ -304,279 +305,326 @@ export function TransitoAniosMesesExperimental() {
   }
 
   return (
-    <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
+    <motion.div className="space-y-8 p-6" variants={containerVariants} initial="hidden" animate="show">
+      {/* Header Section */}
       <motion.div variants={cardVariants}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-foreground">Transito por años y meses</h2>
-            <p className="text-sm text-muted-foreground">
-              Resumen anual por mes y comparativo entre años
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary dark:text-primary/90 shadow-sm">
-            {reportTitle}
-          </span>
-        </div>
-      </motion.div>
-
-      <motion.div variants={cardVariants}>
-        <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border/40 bg-card/80 dark:bg-muted/10 p-4 shadow-sm backdrop-blur-md">
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Peaje</p>
-            <Select value={idPeaje} onValueChange={setIdPeaje}>
-              <SelectTrigger className="h-8 w-[170px] bg-background/60 text-xs">
-                <SelectValue placeholder="Peaje" />
-              </SelectTrigger>
-              <SelectContent>
-                {peajeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">Tránsito por años y meses</h2>
+              <p className="text-sm text-muted-foreground">
+                Resumen anual por mes y comparativo entre años
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-2.5 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary ring-1 ring-inset ring-primary/20">
+              <BarChart3 className="h-4 w-4" />
+              {reportTitle}
+            </span>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Forma de pago</p>
-            <Select value={formaPago} onValueChange={setFormaPago}>
-              <SelectTrigger className="h-8 w-[170px] bg-background/60 text-xs">
-                <SelectValue placeholder="Forma de pago" />
-              </SelectTrigger>
-              <SelectContent>
-                {formaPagoOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Porc. desc</p>
-            <Select value={porcDesc} onValueChange={setPorcDesc}>
-              <SelectTrigger className="h-8 w-[140px] bg-background/60 text-xs">
-                <SelectValue placeholder="Porcentaje" />
-              </SelectTrigger>
-              <SelectContent>
-                {porcDescOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Categoria</p>
-            <Select value={idCategoria} onValueChange={setIdCategoria}>
-              <SelectTrigger className="h-8 w-[140px] bg-background/60 text-xs">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriaOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 border-border/40 hover:bg-muted/60 dark:hover:bg-muted/50"
-            onClick={() => {
-              setIdPeaje("2")
-              setFormaPago("all")
-              setPorcDesc("all")
-              setIdCategoria("all")
-            }}
-          >
-            Reset
-          </Button>
-        </div>
-      </motion.div>
-
-      <motion.div variants={cardVariants}>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
-            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-primary/50">
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/20 blur-2xl pointer-events-none" />
-              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.latestYearTitle}</CardTitle>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/25">
-                  <TrendingUp className="h-5 w-5" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <div className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
-                  {loading ? <Skeleton className="h-9 w-32" /> : numberFormatter.format(kpi.latestYearTotal)}
-                </div>                  
-                {!loading && kpi.hasPrevYearData && (
-                    <TrendText variation={kpi.variationLatestYear} baselineText="el año anterior" />
-                )}              
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
-            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-emerald-500/50">
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl pointer-events-none" />
-              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Promedio anual general</CardTitle>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/25">
-                  <Activity className="h-5 w-5" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <div className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
-                  {loading ? <Skeleton className="h-9 w-32" /> : numberFormatter.format(Math.round(kpi.avgYear))}
-                </div>                  
-                {!loading && (
-                    <TrendText variation={kpi.variationLatestVsAvg} baselineText="el último año" />
-                )}              
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div className="h-full" whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
-            <Card className="relative h-full overflow-hidden border-border/50 bg-card/60 backdrop-blur-xl transition-colors hover:border-amber-500/50">
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-amber-500/20 blur-2xl pointer-events-none" />
-              <CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Mejor año ({kpi.maxYear})</CardTitle>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/25">
-                  <BarChart3 className="h-5 w-5" />
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col justify-center gap-1 relative z-10">
-                <div className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70">
-                  {loading ? <Skeleton className="h-7 w-24" /> : numberFormatter.format(kpi.maxYearTotal)}
-                </div>
-                {!loading && (
-                    <TrendText variation={kpi.variationMaxVsAvg} baselineText="el promedio general" className="mt-1" />
-                )}              
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </motion.div>
-
-      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-        <Card className="overflow-hidden border-border/50 bg-card/70 dark:bg-gradient-to-br dark:from-card dark:to-card/50 shadow-sm backdrop-blur-sm">
-          <CardHeader className="border-b border-border/40 bg-muted/30 dark:bg-muted/10">
-            <CardTitle className="text-base font-semibold text-foreground">
-              Grafico estadistico de transito por años y meses
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {loading && <Skeleton className="h-[520px] w-full rounded-xl" />}
-            {!loading && !error && (
-              <ChartContainer config={chartConfig} className="h-[520px] w-full">
-                <BarChart
-                  data={pivotRows}
-                  margin={{
-                    top: 70,
-                    right: 16,
-                    left: 16,
-                    bottom: 72,
-                  }}
-                >
-                  <CartesianGrid vertical={true} stroke="hsl(var(--border))" strokeOpacity={0.9} strokeWidth={1.05} />
-                  <XAxis
-                    dataKey="monthLabel"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={10}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => numberFormatter.format(value)}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, name) => (
-                          <div className="flex w-full justify-between gap-4">
-                            <span className="text-muted-foreground">{name}</span>
-                            <span className="font-mono font-medium tabular-nums">
-                              {numberFormatter.format(Number(value))}
-                            </span>
-                          </div>
-                        )}
-                      />
-                    }
-                  />
-                  {anios.map((anio, index) => (
-                    <Bar
-                      key={anio}
-                      dataKey={`y${anio}`}
-                      name={String(anio)}
-                      fill={`var(--color-y${anio})`}
-                      radius={[3, 3, 0, 0]}
-                      maxBarSize={24}
-                    >
-                      <LabelList
-                        dataKey={`y${anio}`}
-                        position="top"
-                        angle={-90}
-                        offset={8 + (index % 3) * 8}
-                        formatter={(value: number) => numberFormatter.format(value)}
-                        className="fill-foreground text-[9px] font-semibold"
-                      />
-                    </Bar>
+          {/* Filters Section */}
+          <div className="flex flex-wrap items-end gap-4 rounded-2xl border border-border/50 bg-muted/30 p-4 backdrop-blur-sm">
+            <motion.div className="space-y-2" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <p className="ml-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">Peaje</p>
+              <Select value={idPeaje} onValueChange={setIdPeaje}>
+                <SelectTrigger className="h-10 w-[150px] rounded-xl bg-background/80 text-sm font-medium shadow-sm transition-all hover:bg-background hover:shadow-md focus:ring-2 focus:ring-primary/20">
+                  <SelectValue placeholder="Peaje" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {peajeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
                   ))}
-                  <ChartLegend content={<ChartLegendContent className="-mt-2 pb-3" />} verticalAlign="top" />
-                </BarChart>
-              </ChartContainer>
+                </SelectContent>
+              </Select>
+            </motion.div>
+
+            <motion.div className="space-y-2" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <p className="ml-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">Forma de pago</p>
+              <Select value={formaPago} onValueChange={setFormaPago}>
+                <SelectTrigger className="h-10 w-[150px] rounded-xl bg-background/80 text-sm font-medium shadow-sm transition-all hover:bg-background hover:shadow-md focus:ring-2 focus:ring-primary/20">
+                  <SelectValue placeholder="Forma de pago" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {formaPagoOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+
+            <motion.div className="space-y-2" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <p className="ml-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">Porc. desc</p>
+              <Select value={porcDesc} onValueChange={setPorcDesc}>
+                <SelectTrigger className="h-10 w-[130px] rounded-xl bg-background/80 text-sm font-medium shadow-sm transition-all hover:bg-background hover:shadow-md focus:ring-2 focus:ring-primary/20">
+                  <SelectValue placeholder="Porcentaje" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {porcDescOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+
+            <motion.div className="space-y-2" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <p className="ml-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">Categoria</p>
+              <Select value={idCategoria} onValueChange={setIdCategoria}>
+                <SelectTrigger className="h-10 w-[130px] rounded-xl bg-background/80 text-sm font-medium shadow-sm transition-all hover:bg-background hover:shadow-md focus:ring-2 focus:ring-primary/20">
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {categoriaOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 gap-2 rounded-xl px-4 text-sm font-medium text-muted-foreground transition-all hover:bg-background hover:text-foreground hover:shadow-md"
+                onClick={() => {
+                  setIdPeaje("2")
+                  setFormaPago("all")
+                  setPorcDesc("all")
+                  setIdCategoria("all")
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Restablecer
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards */}
+      <motion.div variants={cardVariants}>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          {/* Card 1: Total ultimo ano */}
+          <motion.div className="h-full" whileHover={{ y: -4, scale: 1.01 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+            <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent shadow-lg shadow-blue-500/5 ring-1 ring-blue-500/10">
+              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.latestYearTitle}</CardTitle>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 shadow-sm dark:text-blue-400">
+                  <TrendingUp className="h-5 w-5" />
+                </span>
+              </CardHeader>
+              <CardContent className="relative flex flex-grow flex-col gap-2">
+                <div className="text-3xl font-bold tracking-tight text-foreground">
+                  {loading ? <Skeleton className="h-9 w-36 rounded-lg" /> : numberFormatter.format(kpi.latestYearTotal)}
+                </div>
+                {!loading && kpi.hasPrevYearData && (
+                  <TrendText variation={kpi.variationLatestYear} baselineText="el año anterior" />
+                )}
+                {!loading && !kpi.hasPrevYearData && (
+                  <span className="text-xs text-muted-foreground/80">Sin datos del año anterior</span>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Card 2: Promedio anual */}
+          <motion.div className="h-full" whileHover={{ y: -4, scale: 1.01 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+            <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/10">
+              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Promedio anual general</CardTitle>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 shadow-sm dark:text-emerald-400">
+                  <Activity className="h-5 w-5" />
+                </span>
+              </CardHeader>
+              <CardContent className="relative flex flex-grow flex-col gap-2">
+                <div className="text-3xl font-bold tracking-tight text-foreground">
+                  {loading ? <Skeleton className="h-9 w-36 rounded-lg" /> : numberFormatter.format(Math.round(kpi.avgYear))}
+                </div>
+                {!loading && (
+                  <TrendText variation={kpi.variationLatestVsAvg} baselineText="el último año" />
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Card 3: Mejor año */}
+          <motion.div className="h-full" whileHover={{ y: -4, scale: 1.01 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+            <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/10">
+              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Mejor año ({kpi.maxYear})</CardTitle>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 shadow-sm dark:text-amber-400">
+                  <BarChart3 className="h-5 w-5" />
+                </span>
+              </CardHeader>
+              <CardContent className="relative flex flex-grow flex-col gap-2">
+                <div className="text-3xl font-bold tracking-tight text-foreground">
+                  {loading ? <Skeleton className="h-9 w-36 rounded-lg" /> : numberFormatter.format(kpi.maxYearTotal)}
+                </div>
+                {!loading && (
+                  <TrendText variation={kpi.variationMaxVsAvg} baselineText="el promedio general" />
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Chart Card */}
+      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+        <Card className="overflow-hidden rounded-2xl border-0 bg-card shadow-xl ring-1 ring-border/50">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-muted/30 px-6 py-5">
+            <div className="flex items-center gap-4">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm">
+                <BarChart3 className="h-6 w-6" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold">Gráfico estadístico de tránsito</CardTitle>
+                <CardDescription className="mt-0.5 text-sm">
+                  Comparativo por años y meses
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {loading && (
+              <div className="p-4">
+                <Skeleton className="h-[520px] w-full rounded-2xl" />
+              </div>
+            )}
+            {!loading && !error && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                <ChartContainer config={chartConfig} className="h-[520px] w-full">
+                  <BarChart
+                    data={pivotRows}
+                    margin={{
+                      top: 70,
+                      right: 16,
+                      left: 16,
+                      bottom: 72,
+                    }}
+                  >
+                    <CartesianGrid vertical={true} strokeDasharray="4 4" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                    <XAxis
+                      dataKey="monthLabel"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontWeight: 500 }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontWeight: 500 }}
+                      tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
+                    />
+                    <ChartTooltip
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value, name) => (
+                            <div className="flex w-full justify-between gap-4">
+                              <span className="text-muted-foreground">{name}</span>
+                              <span className="font-mono font-semibold tabular-nums">
+                                {numberFormatter.format(Number(value))}
+                              </span>
+                            </div>
+                          )}
+                        />
+                      }
+                    />
+                    {anios.map((anio, index) => (
+                      <Bar
+                        key={anio}
+                        dataKey={`y${anio}`}
+                        name={String(anio)}
+                        fill={`var(--color-y${anio})`}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={28}
+                      >
+                        <LabelList
+                          dataKey={`y${anio}`}
+                          position="top"
+                          angle={-90}
+                          offset={8 + (index % 3) * 8}
+                          formatter={(value: number) => numberFormatter.format(value)}
+                          className="fill-foreground text-[9px] font-semibold"
+                        />
+                      </Bar>
+                    ))}
+                    <ChartLegend content={<ChartLegendContent className="-mt-2 pb-3" />} verticalAlign="top" />
+                  </BarChart>
+                </ChartContainer>
+              </motion.div>
             )}
           </CardContent>
         </Card>
       </motion.div>
 
-      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-        <Card className="overflow-hidden border-border/50 bg-card/70 dark:bg-gradient-to-br dark:from-card dark:to-card/50 shadow-sm backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 bg-muted/30 dark:bg-muted/10">
-            <div>
-              <CardTitle className="text-base">Detalle mensual</CardTitle>
+      {/* Table Card */}
+      <motion.div variants={cardVariants} whileHover={{ y: -2 }} transition={{ duration: 0.25, ease: "easeOut" }}>
+        <Card className="overflow-hidden rounded-2xl border-0 bg-card shadow-xl ring-1 ring-border/50">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-muted/30 px-6 py-5">
+            <div className="flex items-center gap-4">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm">
+                <Activity className="h-6 w-6" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold">Detalle mensual</CardTitle>
+                <CardDescription className="mt-0.5 text-sm">
+                  {pivotRows.length} meses disponibles
+                </CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {loading && (
-              <div className="p-4 space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+              <div className="divide-y divide-border/30">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="flex items-center justify-between px-6 py-4">
+                    <Skeleton className="h-6 w-28 rounded-lg" />
+                    <Skeleton className="h-6 w-20 rounded-lg" />
+                    <Skeleton className="h-6 w-20 rounded-lg" />
+                    <Skeleton className="h-6 w-24 rounded-lg" />
+                  </div>
+                ))}
               </div>
             )}
-            {error && !loading && <p className="px-3 py-3 text-sm text-destructive">{error}</p>}
+            {error && !loading && (
+              <div className="px-6 py-8 text-center">
+                <p className="text-sm font-medium text-destructive">{error}</p>
+              </div>
+            )}
             {!loading && !error && (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[920px] border-collapse">
                   <thead>
-                    <tr className="border-b border-border/60 bg-muted/40 dark:bg-muted/30">
-                      <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <tr className="border-b border-border/50 bg-muted/50">
+                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Mes
                       </th>
                       {anios.map((anio, idx) => (
-                        <th key={anio} className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                          <div className="inline-flex items-center gap-1.5 justify-end">
-                            <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `var(--chart-${(idx % 5) + 1})` }} />
-                            <span>{anio}</span>
+                        <th key={anio} className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: `var(--chart-${(idx % 5) + 1})` }} />
+                            {anio}
                           </div>
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        <div className="inline-flex items-center gap-1.5 justify-end">
-                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          <span>Total general</span>
+                      <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                          Total general
                         </div>
                       </th>
                     </tr>
@@ -589,40 +637,38 @@ export function TransitoAniosMesesExperimental() {
                         custom={index}
                         initial="hidden"
                         animate="show"
-                        className={`border-b border-border/40 transition-colors hover:bg-muted/50 dark:hover:bg-muted/30 ${index % 2 === 0 ? "bg-card/40 dark:bg-card/20" : "bg-muted/20 dark:bg-muted/5"}`}
+                        className={cn(
+                          "border-b border-border/30 transition-colors last:border-0",
+                          index % 2 === 0 ? "bg-transparent" : "bg-muted/20",
+                          "hover:bg-primary/5"
+                        )}
                       >
-                        <td className="px-4 py-2.5 text-sm font-medium text-foreground">
-                          <span className="inline-flex items-center rounded-md border border-border/50 bg-white/60 dark:bg-background/60 px-2 py-0.5 text-xs font-medium text-foreground/90 shadow-sm backdrop-blur-sm">
-                            {row.monthLabel}
-                          </span>
+                        <td className="px-6 py-4 text-sm font-medium text-foreground">
+                          {row.monthLabel}
                         </td>
                         {anios.map((anio) => (
-                          <td key={`${row.monthLabel}-${anio}`} className="px-4 py-2.5 text-right text-sm tabular-nums text-foreground/80">
-                            <span className="font-medium">
-                              {numberFormatter.format(Number(row[`y${anio}`] ?? 0))}
-                            </span>
+                          <td key={`${row.monthLabel}-${anio}`} className="px-6 py-4 text-right font-mono text-sm tabular-nums text-muted-foreground">
+                            {numberFormatter.format(Number(row[`y${anio}`] ?? 0))}
                           </td>
                         ))}
-                        <td className="px-4 py-2.5 text-right text-sm font-semibold tabular-nums text-foreground">
-                          <span className="inline-flex items-center rounded-md border border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-400">
-                            {numberFormatter.format(Number(row.totalGeneral ?? 0))}
-                          </span>
+                        <td className="px-6 py-4 text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                          {numberFormatter.format(Number(row.totalGeneral ?? 0))}
                         </td>
                       </motion.tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-border/60 bg-muted/60 dark:bg-muted/40">
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Total general</th>
+                    <tr className="border-t-2 border-border/50 bg-muted/40">
+                      <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider text-foreground">
+                        Total general
+                      </th>
                       {anios.map((anio) => (
-                        <th key={`total-${anio}`} className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-foreground">
+                        <th key={`total-${anio}`} className="px-6 py-4 text-right font-mono text-sm font-bold tabular-nums text-muted-foreground">
                           {numberFormatter.format(totalesPorAnio[anio] ?? 0)}
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                        <span className="inline-flex items-center rounded-md border border-emerald-300/50 dark:border-emerald-500/30 bg-emerald-100 dark:bg-emerald-500/20 px-2.5 py-0.5 font-bold text-emerald-800 dark:text-emerald-300">
-                          {numberFormatter.format(totalGeneral)}
-                        </span>
+                      <th className="px-6 py-4 text-right font-mono text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {numberFormatter.format(totalGeneral)}
                       </th>
                     </tr>
                   </tfoot>
