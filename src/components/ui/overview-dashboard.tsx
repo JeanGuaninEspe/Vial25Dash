@@ -130,7 +130,7 @@ const BASE_URL = import.meta.env.PUBLIC_BASE_URL || ""
 const RECAUDACION_DIARIO_ENDPOINT = "/recaudacion"
 const ESTADISTICO_ENDPOINT = "/r-estadistico"
 const TRANSITO_ENDPOINT = "/r-estadistico/reporte-mensual-semanal"
-const RFID_ENDPOINT = "/api/v2/descuentos-rfid"
+const RFID_ENDPOINT = "/api/v2/descuentos-rfid?page=1&limit=1000000"
 const TRAFFIC_ALERT_THRESHOLD = 8000
 const PEAJE_TRAFFIC_ALERT_THRESHOLD = 4000
 

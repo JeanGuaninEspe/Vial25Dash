@@ -1,4 +1,4 @@
-﻿import * as React from "react"
+import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   AlertCircle,
@@ -61,7 +61,17 @@ type SystemUser = {
   createdAt?: string | null
 }
 
-type UsersResponse = SystemUser[] | { data?: SystemUser[] }
+type UsersResponse =
+  | SystemUser[]
+  | {
+      data?: SystemUser[]
+      meta?: {
+        total?: number
+        page?: number
+        limit?: number
+        totalPages?: number
+      }
+    }
 type AdminTab = "usuarios" | "nuevo" | "estadisticas"
 
 type NewUserForm = {
@@ -144,6 +154,10 @@ export function AdminPanel() {
   const [users, setUsers] = React.useState<SystemUser[]>([])
   const [loading, setLoading] = React.useState(true)
   const [fetchError, setFetchError] = React.useState<string | null>(null)
+  const [page, setPage] = React.useState(1)
+  const [limit, setLimit] = React.useState(10)
+  const [totalRows, setTotalRows] = React.useState(0)
+  const [totalPages, setTotalPages] = React.useState(0)
 
   const [search, setSearch] = React.useState("")
   const [roleFilter, setRoleFilter] = React.useState<string>("all")
@@ -169,7 +183,7 @@ export function AdminPanel() {
     setLoading(true)
     setFetchError(null)
     try {
-      const res = await apiFetch("/api/v2/users", {
+      const res = await apiFetch(`/api/v2/users?page=${page}&limit=${limit}`, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -182,18 +196,33 @@ export function AdminPanel() {
       }
       const payload = (await res.json()) as UsersResponse
       const rows = Array.isArray(payload) ? payload : payload.data || []
+      const meta = !Array.isArray(payload) ? payload.meta : null
+
       setUsers(rows.map(normalizeUser))
+      if (meta) {
+        setTotalRows(meta.total ?? 0)
+        setTotalPages(meta.totalPages ?? 0)
+      } else {
+        setTotalRows(rows.length)
+        setTotalPages(1)
+      }
     } catch (err) {
       setUsers([])
+      setTotalRows(0)
+      setTotalPages(0)
       setFetchError(err instanceof Error ? err.message : "No se pudieron cargar los usuarios.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, limit])
 
   React.useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [search, roleFilter, statusFilter])
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -544,7 +573,7 @@ export function AdminPanel() {
                     Gestión de Empleados
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {loading ? "Sincronizando datos..." : `Mostrando ${filteredUsers.length} de ${users.length} usuarios en total`}
+                    {loading ? "Sincronizando datos..." : `Mostrando ${filteredUsers.length} de ${totalRows} usuarios en total`}
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -763,6 +792,83 @@ export function AdminPanel() {
                       </AnimatePresence>
                     </motion.tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Paginación */}
+              {!loading && !fetchError && totalRows > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-5 mt-4 border-t border-border/10">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando del <span className="font-semibold text-foreground">{Math.min((page - 1) * limit + 1, totalRows)}</span> al{" "}
+                    <span className="font-semibold text-foreground">{Math.min(page * limit, totalRows)}</span> de{" "}
+                    <span className="font-semibold text-foreground">{totalRows}</span> usuarios
+                  </div>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Límite:
+                      </span>
+                      <Select
+                        value={String(limit)}
+                        onValueChange={(val) => {
+                          setLimit(Number(val))
+                          setPage(1)
+                        }}
+                      >
+                        <SelectTrigger className="h-9 w-20 rounded-xl bg-background/60 backdrop-blur-sm border-border/30">
+                          <SelectValue placeholder={String(limit)} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-border/20 shadow-xl backdrop-blur-xl bg-background/95">
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(1)}
+                        disabled={page === 1}
+                        className="h-9 px-2 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                      >
+                        «
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                        disabled={page === 1}
+                        className="h-9 px-3 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                      >
+                        Anterior
+                      </Button>
+                      <span className="flex items-center justify-center px-3 h-9 text-sm font-medium border border-border/30 bg-background/20 rounded-xl select-none min-w-[36px]">
+                        {page}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                        disabled={page === totalPages}
+                        className="h-9 px-3 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                      >
+                        Siguiente
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(totalPages)}
+                        disabled={page === totalPages}
+                        className="h-9 px-2 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                      >
+                        »
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

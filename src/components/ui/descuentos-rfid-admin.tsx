@@ -62,7 +62,17 @@ type DescuentoRfid = {
   activo: boolean | null
 }
 
-type DescuentosRfidResponse = DescuentoRfid[] | { data?: DescuentoRfid[] }
+type DescuentosRfidResponse =
+  | DescuentoRfid[]
+  | {
+      data?: DescuentoRfid[]
+      meta?: {
+        total?: number
+        page?: number
+        limit?: number
+        totalPages?: number
+      }
+    }
 type SortByVigencia = "asc" | "desc"
 type AuthorizationTab = "approved" | "rejected" | "pending"
 
@@ -591,6 +601,10 @@ export function DescuentosRfidAdmin() {
   const [rows, setRows] = React.useState<DescuentoRfid[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [page, setPage] = React.useState(1)
+  const [limit, setLimit] = React.useState(10)
+  const [totalRows, setTotalRows] = React.useState(0)
+  const [totalPages, setTotalPages] = React.useState(0)
   const [searchText, setSearchText] = React.useState("")
   const [selectedPeaje, setSelectedPeaje] = React.useState("all")
   const [vigenciaSort, setVigenciaSort] = React.useState<SortByVigencia>("asc")
@@ -880,10 +894,59 @@ export function DescuentosRfidAdmin() {
   const handleExport = async (format: "pdf" | "xlsx", type: ReportType) => {
     setExportLoading(true)
     try {
+      const response = await apiFetch(`/api/v2/descuentos-rfid?page=1&limit=1000000`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      })
+      if (!response.ok) {
+        throw new Error("No se pudo obtener el listado completo para exportar.")
+      }
+
+      const payload = (await response.json()) as DescuentosRfidResponse
+      const allRows = Array.isArray(payload) ? payload : payload.data || []
+
+      const text = searchText.trim().toLowerCase()
+      const allFilteredRows = allRows
+        .filter((row) => {
+          const matchesText =
+            !text ||
+            normalizeText(row.apellidosYNombres).includes(text) ||
+            normalizeText(row.cedulaORuc).includes(text) ||
+            normalizeText(row.placa).includes(text) ||
+            normalizeText(row.documentoIngreso).includes(text)
+
+          const matchesPeaje = selectedPeaje === "all" || displayText(row.peaje) === selectedPeaje
+          const matchesTab =
+            (statusTab === "approved" && isApproved(row.autorizacion)) ||
+            (statusTab === "rejected" && isRejectedOrDenied(row.autorizacion)) ||
+            (statusTab === "pending" && isPending(row.autorizacion))
+
+          return matchesText && matchesPeaje && matchesTab
+        })
+        .sort((a, b) => {
+          const dateA = getVigenciaTimestamp(a.vigencia)
+          const dateB = getVigenciaTimestamp(b.vigencia)
+
+          const hasDateA = dateA !== null
+          const hasDateB = dateB !== null
+
+          if (!hasDateA && !hasDateB) return 0
+          if (!hasDateA) return 1
+          if (!hasDateB) return -1
+
+          if (vigenciaSort === "asc") {
+            return dateA - dateB
+          }
+
+          return dateB - dateA
+        })
+
       if (format === "pdf") {
-        await generatePDF(type, rows, filteredRows)
+        await generatePDF(type, allRows, allFilteredRows)
       } else {
-        await generateExcel(type, rows, filteredRows)
+        await generateExcel(type, allRows, allFilteredRows)
       }
     } catch (e) {
       console.error("Export error:", e)
@@ -896,7 +959,7 @@ export function DescuentosRfidAdmin() {
     setLoading(true)
 
     try {
-      const response = await apiFetch(`/api/v2/descuentos-rfid`, {
+      const response = await apiFetch(`/api/v2/descuentos-rfid?page=${page}&limit=${limit}`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -913,20 +976,34 @@ export function DescuentosRfidAdmin() {
 
       const payload = (await response.json()) as DescuentosRfidResponse
       const data = Array.isArray(payload) ? payload : payload.data || []
+      const meta = !Array.isArray(payload) ? payload.meta : null
 
       setRows(Array.isArray(data) ? data : [])
+      if (meta) {
+        setTotalRows(meta.total ?? 0)
+        setTotalPages(meta.totalPages ?? 0)
+      } else {
+        setTotalRows(data.length)
+        setTotalPages(1)
+      }
       setError(null)
     } catch (err) {
       setRows([])
+      setTotalRows(0)
+      setTotalPages(0)
       setError(err instanceof Error ? err.message : "Error inesperado al cargar descuentos RFID.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, limit])
 
   React.useEffect(() => {
     fetchRows()
   }, [fetchRows])
+
+  React.useEffect(() => {
+    setPage(1)
+  }, [searchText, selectedPeaje, statusTab])
 
   const peajes = React.useMemo(() => {
     return Array.from(
@@ -1014,7 +1091,7 @@ export function DescuentosRfidAdmin() {
               <p className="text-xs font-bold uppercase tracking-widest text-primary/80">Gestión de Accesos</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight">Descuentos RFID</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {filteredRows.length} registros visibles de {rows.length} totales
+                {filteredRows.length} registros visibles de {totalRows} totales
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1563,6 +1640,83 @@ export function DescuentosRfidAdmin() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Paginación */}
+        {!loading && !error && totalRows > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-5 mt-4 border-t border-border/10">
+            <div className="text-sm text-muted-foreground">
+              Mostrando del <span className="font-semibold text-foreground">{Math.min((page - 1) * limit + 1, totalRows)}</span> al{" "}
+              <span className="font-semibold text-foreground">{Math.min(page * limit, totalRows)}</span> de{" "}
+              <span className="font-semibold text-foreground">{totalRows}</span> registros
+            </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Límite:
+                </span>
+                <Select
+                  value={String(limit)}
+                  onValueChange={(val) => {
+                    setLimit(Number(val))
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-20 rounded-xl bg-background/60 backdrop-blur-sm border-border/30">
+                    <SelectValue placeholder={String(limit)} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-border/20 shadow-xl backdrop-blur-xl bg-background/95">
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                  className="h-9 px-2 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                >
+                  «
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={page === 1}
+                  className="h-9 px-3 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                >
+                  Anterior
+                </Button>
+                <span className="flex items-center justify-center px-3 h-9 text-sm font-medium border border-border/30 bg-background/20 rounded-xl select-none min-w-[36px]">
+                  {page}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={page === totalPages}
+                  className="h-9 px-3 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                >
+                  Siguiente
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page === totalPages}
+                  className="h-9 px-2 rounded-xl bg-background/60 border-border/30 hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                >
+                  »
+                </Button>
+              </div>
+            </div>
           </div>
         )}
           </CardContent>
