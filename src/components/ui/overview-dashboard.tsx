@@ -154,32 +154,32 @@ const statusToneStyles: Record<StatusType, {
   description: string
 }> = {
   normal: {
-    card: "border-emerald-500/30 bg-emerald-500/[0.04] shadow-emerald-500/10",
-    icon: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-    badge: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-    value: "text-slate-950 dark:text-slate-50",
-    description: "text-emerald-800/80 dark:text-emerald-300/90",
+    card: "border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200",
+    icon: "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-400",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400",
+    value: "text-zinc-900 dark:text-zinc-50",
+    description: "text-zinc-500 dark:text-zinc-400",
   },
   warning: {
-    card: "border-amber-500/35 bg-amber-500/[0.05] shadow-amber-500/10",
-    icon: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-    badge: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-    value: "text-slate-950 dark:text-slate-50",
-    description: "text-amber-900/80 dark:text-amber-300/90",
+    card: "border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200",
+    icon: "border-amber-100 bg-amber-50 text-amber-600 dark:border-amber-950 dark:bg-amber-950/30 dark:text-amber-400",
+    badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-400",
+    value: "text-zinc-900 dark:text-zinc-50",
+    description: "text-zinc-500 dark:text-zinc-400",
   },
   critical: {
-    card: "border-rose-500/35 bg-rose-500/[0.06] shadow-rose-500/10",
-    icon: "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400",
-    badge: "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400",
-    value: "text-slate-950 dark:text-slate-50",
-    description: "text-rose-900/80 dark:text-rose-300/90",
+    card: "border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200",
+    icon: "border-rose-100 bg-rose-50 text-rose-600 dark:border-rose-950 dark:bg-rose-950/30 dark:text-rose-400",
+    badge: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-400",
+    value: "text-zinc-900 dark:text-zinc-50",
+    description: "text-zinc-500 dark:text-zinc-400",
   },
   neutral: {
-    card: "border-border/70 bg-card/90 shadow-black/5",
-    icon: "border-primary/20 bg-primary/10 text-primary",
-    badge: "border-border/60 bg-muted/60 text-muted-foreground",
-    value: "text-slate-950 dark:text-slate-50",
-    description: "text-muted-foreground",
+    card: "border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all duration-200",
+    icon: "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/30 dark:text-zinc-400",
+    badge: "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/20 dark:text-zinc-400",
+    value: "text-zinc-900 dark:text-zinc-50",
+    description: "text-zinc-500 dark:text-zinc-400",
   },
 }
 
@@ -1155,9 +1155,9 @@ export function OverviewDashboard() {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-border bg-gradient-to-b from-secondary/40 to-secondary/10 p-3">
+                <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40 p-4">
                   {displayCabinaStatuses.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
                       {displayCabinaStatuses.map((lane) => {
                         const cfg = laneStatusConfig[lane.status]
                         const Icon = cfg.icon
@@ -1167,73 +1167,68 @@ export function OverviewDashboard() {
                           <div
                             key={lane.key}
                             className={cn(
-                              "group relative overflow-hidden rounded-md border bg-card p-3 transition-all hover:shadow-md ring-1",
-                              isActive ? "border-border" : "border-border/60 opacity-90",
-                              cfg.ring,
+                              "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 bg-white dark:bg-zinc-900/50 shadow-sm border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md",
+                              !isActive && "opacity-75"
                             )}
                           >
-                            <div className={cn("absolute inset-x-0 top-0 h-1", cfg.bar)} />
+                            <div className={cn("absolute inset-x-0 top-0 h-[3px]", isActive ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700")} />
 
-                            <div className="mb-2 flex items-center justify-between">
+                            <div className="mb-3 flex items-start justify-between">
                               <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase">{lane.peajeShort}</span>
-                                <span className="text-xs font-semibold text-muted-foreground">Carril {String(lane.id).padStart(2, "0")}</span>
+                                <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{lane.peajeShort}</span>
+                                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-250">Carril {String(lane.id).padStart(2, "0")}</span>
                               </div>
+                              <span className={cn("flex h-2 w-2 rounded-full", isActive ? "bg-emerald-500" : "bg-rose-500")} />
                             </div>
 
-                            <div className={cn("mb-2 w-max flex items-center gap-1.5 rounded px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider", cfg.bg, cfg.text)}>
-                              <Icon className="h-3 w-3" strokeWidth={2.5} />
+                            <div className={cn(
+                              "mb-3.5 w-fit flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider border",
+                              isActive
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30"
+                                : "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30"
+                            )}>
+                              <Icon className="h-3.5 w-3.5" />
                               {cfg.label}
                             </div>
 
-                            <div className="relative mt-3 h-9 overflow-hidden rounded-md bg-stone-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]">
-                              {/* Asfalto */}
-                              <div className="absolute inset-0 bg-gradient-to-b from-stone-900/50 to-transparent" />
-                              
-                              {/* Líneas divisorias amarillas */}
+                            <div className="relative mt-3.5 h-7 overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80">
+                              {/* Divisor de carril plano */}
                               <div
-                                className="absolute inset-y-1/2 h-0.5 w-full -translate-y-1/2"
+                                className="absolute inset-y-1/2 h-[1px] w-full -translate-y-1/2"
                                 style={{
-                                  backgroundImage: "repeating-linear-gradient(90deg, #fbbf24 0, #fbbf24 10px, transparent 10px, transparent 20px)",
-                                  opacity: 0.8,
+                                  backgroundImage: "repeating-linear-gradient(90deg, #d4d4d8 0, #d4d4d8 8px, transparent 8px, transparent 16px)",
                                 }}
                               />
                               
-                              {/* Vehículo animado */}
+                              {/* Vehículo minimalista plano */}
                               {isActive && (
                                 <motion.div
-                                  className="absolute top-1/2 h-3.5 w-6 -translate-y-1/2 rounded shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
-                                  style={{
-                                    background: "linear-gradient(to bottom, #d1d5db, #f3f4f6, #d1d5db)",
-                                  }}
+                                  className="absolute top-1/2 h-2.5 w-5 -translate-y-1/2 rounded bg-zinc-400 dark:bg-zinc-650 shadow-sm"
                                   initial={{ left: "-20%" }}
                                   animate={{ left: "120%" }}
                                   transition={{
-                                    duration: 1.8 + (lane.id % 3) * 0.4,
+                                    duration: 2.0 + (lane.id % 3) * 0.4,
                                     repeat: Number.POSITIVE_INFINITY,
                                     ease: "linear",
-                                    delay: (lane.id % 5) * 0.38,
+                                    delay: (lane.id % 5) * 0.4,
                                   }}
                                 >
-                                  {/* Luces traseras rojas */}
-                                  <div className="absolute top-1/2 left-0.5 h-2 w-0.5 -translate-y-1/2 bg-red-600 rounded-sm opacity-90 shadow-[0_0_4px_rgba(220,38,38,0.8)]" />
-                                  {/* Luces delanteras (faros) */}
-                                  <div className="absolute top-1/2 right-0 flex -translate-y-1/2 flex-col gap-1 pr-0.5">
-                                    <div className="h-0.5 w-0.5 bg-yellow-200 rounded-full shadow-[0_0_6px_2px_rgba(253,224,71,0.8)]" />
-                                    <div className="h-0.5 w-0.5 bg-yellow-200 rounded-full shadow-[0_0_6px_2px_rgba(253,224,71,0.8)]" />
-                                  </div>
+                                  {/* Faro de freno trasero */}
+                                  <div className="absolute top-1/2 left-0 h-1.5 w-0.5 -translate-y-1/2 bg-rose-500 rounded-sm" />
+                                  {/* Faro delantero */}
+                                  <div className="absolute top-1/2 right-0 h-1.5 w-0.5 -translate-y-1/2 bg-amber-300 rounded-sm" />
                                 </motion.div>
                               )}
                             </div>
 
-                            <div className="mt-2 flex items-center justify-between text-[11px]">
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <Car className="h-3 w-3" />
-                                <span className="font-mono font-semibold tabular-nums">{lane.queue}</span>
+                            <div className="mt-3 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                              <span className="flex items-center gap-1.5">
+                                <Car className="h-3.5 w-3.5 text-zinc-400" />
+                                <span className="font-mono font-medium">{lane.queue} en cola</span>
                               </span>
-                              <span className="font-mono font-semibold tabular-nums text-foreground">
+                              <span className="font-mono font-medium text-zinc-700 dark:text-zinc-300">
                                 {numberFormatter.format(lane.throughput)}
-                                <span className="ml-0.5 text-[9px] font-normal text-muted-foreground">v/h</span>
+                                <span className="ml-0.5 text-[9px] font-normal text-zinc-400">v/h</span>
                               </span>
                             </div>
                           </div>
@@ -1241,7 +1236,7 @@ export function OverviewDashboard() {
                       })}
                     </div>
                   ) : (
-                    <div className="rounded-md border border-dashed border-border/60 bg-card/60 p-5 text-center text-sm text-muted-foreground">
+                    <div className="rounded-md border border-dashed border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/10 p-5 text-center text-sm text-zinc-500">
                       Sin datos de carriles para este peaje.
                     </div>
                   )}
@@ -1700,27 +1695,27 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
               <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCongoma" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.06} />
+                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorLosAngeles" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.06} />
+                    <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.06} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={(val) => format(new Date(val + "T12:00:00"), "dd MMM", { locale: es })}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.5 }}
                   dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.5 }}
                   tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
                 />
                 <ReferenceLine
@@ -1729,23 +1724,23 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                     position: 'insideTopLeft',
                     value: peajeFilter === 'all' ? 'Alerta de Congestión' : 'Límite Operativo',
                     fill: '#f43f5e',
-                    fontSize: 11,
+                    fontSize: 10,
                   }}
                   stroke="#f43f5e"
                   strokeDasharray="3 3"
-                  opacity={0.8}
+                  opacity={0.6}
                 />
                 <RechartsTooltip
-                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.25 }}
                   contentStyle={{
-                    borderRadius: '12px',
-                    borderColor: 'hsl(border)',
+                    borderRadius: '8px',
+                    border: '1px solid hsl(var(--border))',
                     backgroundColor: 'hsl(var(--card))',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                     padding: '8px 12px'
                   }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
-                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 650, color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px', fontSize: '11px', fontWeight: 500 }}
                   labelFormatter={(val) => format(new Date(val + "T12:00:00"), "EEEE, dd MMM", { locale: es })}
                   formatter={(val: number) => [numberFormatter.format(val), ""]}
                 />
@@ -1753,14 +1748,14 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                   verticalAlign="top"
                   height={36}
                   iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ fontSize: '12px' }}
+                  iconSize={7}
+                  wrapperStyle={{ fontSize: '11px' }}
                 />
                 {peajeFilter !== "LOS_ANGELES" && (
-                  <Area type="stepAfter" dataKey="congoma" name="Cóngoma" stackId="1" stroke="var(--chart-1)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCongoma)" />
+                  <Area type="stepAfter" dataKey="congoma" name="Cóngoma" stackId="1" stroke="var(--chart-1)" strokeWidth={1.8} fillOpacity={1} fill="url(#colorCongoma)" activeDot={{ r: 4, strokeWidth: 1.5 }} />
                 )}
                 {peajeFilter !== "CONGOMA" && (
-                  <Area type="stepAfter" dataKey="losAngeles" name="Los Angeles" stackId="1" stroke="var(--chart-2)" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLosAngeles)" />
+                  <Area type="stepAfter" dataKey="losAngeles" name="Los Angeles" stackId="1" stroke="var(--chart-2)" strokeWidth={1.8} fillOpacity={1} fill="url(#colorLosAngeles)" activeDot={{ r: 4, strokeWidth: 1.5 }} />
                 )}
               </AreaChart>
             </ResponsiveContainer>
@@ -1769,41 +1764,40 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
               <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.06} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.06} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={(val) => format(new Date(val + "T12:00:00"), "dd MMM", { locale: es })}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.5 }}
                   dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                  tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.5 }}
                   tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`}
                 />
                 <RechartsTooltip
-                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.3 }}
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.25 }}
                   contentStyle={{
-                    borderRadius: '16px',
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    backgroundColor: 'rgba(15,23,42,0.85)',
-                    backdropFilter: 'blur(12px)',
-                    boxShadow: '0 12px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'hsl(var(--card))',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    padding: '8px 12px'
                   }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: '#10b981' }}
-                  labelStyle={{ color: 'rgb(148,163,184)', marginBottom: '6px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 650, color: '#10b981' }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px', fontSize: '11px', fontWeight: 500 }}
                   labelFormatter={(val) => format(new Date(val + "T12:00:00"), "EEEE, dd MMM", { locale: es })}
                   formatter={(val: number) => [amountFormatter.format(val), ""]}
                 />
-                <Area type="linear" dataKey="total" name="Total Recaudado" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" activeDot={{ r: 5, strokeWidth: 1.5 }} />
+                <Area type="linear" dataKey="total" name="Total Recaudado" stroke="#10b981" strokeWidth={1.8} fillOpacity={1} fill="url(#colorRevenue)" activeDot={{ r: 4, strokeWidth: 1.5 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}
