@@ -436,10 +436,22 @@ function buildCabinaStatuses(
       const key = `${item.peajeKey}-${item.id}`
       
       let status: LaneStatus = "open"
-      // Cerrado si no ha tenido actividad en 5 minutos (300,000 ms)
-      const inactiveMinutes = (nowMs - item.lastActivityMs) / 60000
-      if (inactiveMinutes >= 5) {
-        status = "closed"
+      // Verificar si la base de datos devuelve transacciones con hora y minuto detallados
+      const hasDetailedTime = rows.some(
+        (r) => r.FECHA && r.FECHA.includes("T") && r.FECHA.split("T")[1]?.includes(":")
+      )
+
+      if (hasDetailedTime && item.lastActivityMs > 0) {
+        // Si hay marcas de tiempo precisas, consideramos cerrado tras 30 minutos de inactividad
+        const inactiveMinutes = (nowMs - item.lastActivityMs) / 60000
+        if (inactiveMinutes >= 30) {
+          status = "closed"
+        }
+      } else {
+        // Si es fecha agrupada (o sin hora de última actividad), está abierto si registra tránsito hoy
+        if (item.totalHoy === 0) {
+          status = "closed"
+        }
       }
 
       const tone: StatusType = status === "closed" ? "critical" : "normal"
@@ -1766,20 +1778,21 @@ function ChartCard({ title, description, icon: Icon, iconColor, data, type, peaj
                   tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`}
                 />
                 <RechartsTooltip
-                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.4 }}
+                  cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.3 }}
                   contentStyle={{
-                    borderRadius: '12px',
-                    borderColor: 'hsl(border)',
-                    backgroundColor: 'hsl(var(--card))',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                    padding: '8px 12px'
+                    borderRadius: '16px',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    backgroundColor: 'rgba(15,23,42,0.85)',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
+                    padding: '10px 14px',
                   }}
-                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))' }}
-                  labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '6px', fontSize: '12px', fontWeight: 500 }}
+                  itemStyle={{ fontSize: '13px', fontWeight: 600, color: '#10b981' }}
+                  labelStyle={{ color: 'rgb(148,163,184)', marginBottom: '6px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}
                   labelFormatter={(val) => format(new Date(val + "T12:00:00"), "EEEE, dd MMM", { locale: es })}
                   formatter={(val: number) => [amountFormatter.format(val), ""]}
                 />
-                <Area type="linear" dataKey="total" name="Total Recaudado" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
+                <Area type="linear" dataKey="total" name="Total Recaudado" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" activeDot={{ r: 5, strokeWidth: 1.5 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}
