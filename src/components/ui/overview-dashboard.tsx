@@ -188,7 +188,7 @@ const laneStatusConfig: Record<
   { label: string; bar: string; ring: string; text: string; bg: string; icon: React.ElementType }
 > = {
   open: {
-    label: "Abierto",
+    label: "ABIERTO",
     bar: "bg-emerald-500",
     ring: "ring-emerald-500/40",
     text: "text-emerald-700 dark:text-emerald-400",
@@ -196,7 +196,7 @@ const laneStatusConfig: Record<
     icon: Users,
   },
   closed: {
-    label: "Cerrado (Sin Actividad - 5 min)",
+    label: "CERRADO",
     bar: "bg-destructive",
     ring: "ring-destructive/40",
     text: "text-destructive",
@@ -357,6 +357,13 @@ function getPeajeKeyFromId(value: number | null | undefined): Exclude<PeajeFilte
   return null
 }
 
+function normalizeDateToYMD(dateVal: any): string {
+  if (!dateVal) return ""
+  const str = String(dateVal).trim()
+  const match = str.match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : ""
+}
+
 function buildCabinaStatuses(
   rows: EstadisticoRow[],
   todayStr: string,
@@ -393,7 +400,7 @@ function buildCabinaStatuses(
       if (!isNaN(ms)) activityMs = ms
     }
     
-    const dateStr = row.FECHA ? (row.FECHA.includes("T") ? row.FECHA.split("T")[0] : row.FECHA) : ""
+    const dateStr = normalizeDateToYMD(row.FECHA)
     const key = `${peajeKey}-${cabina}`
     const current = grouped.get(key) ?? {
       id: cabina,
@@ -437,9 +444,13 @@ function buildCabinaStatuses(
       
       let status: LaneStatus = "open"
       // Verificar si la base de datos devuelve transacciones con hora y minuto detallados
-      const hasDetailedTime = rows.some(
-        (r) => r.FECHA && r.FECHA.includes("T") && r.FECHA.split("T")[1]?.includes(":")
-      )
+      const hasDetailedTime = rows.some((r) => {
+        if (!r.FECHA) return false
+        const str = String(r.FECHA)
+        const timeMatch = str.match(/(?:T|\s)(\d{2}):(\d{2}):(\d{2})/)
+        if (!timeMatch) return false
+        return timeMatch[1] !== "00" || timeMatch[2] !== "00"
+      })
 
       if (hasDetailedTime && item.lastActivityMs > 0) {
         // Si hay marcas de tiempo precisas, consideramos cerrado tras 30 minutos de inactividad
@@ -589,7 +600,7 @@ export function OverviewDashboard() {
           const recByDate = new Map<string, number>()
           agg.forEach((item: any) => {
             if (item && item.fecha) {
-              const normalDate = String(item.fecha).includes("T") ? String(item.fecha).split("T")[0] : String(item.fecha)
+              const normalDate = normalizeDateToYMD(item.fecha)
               const cVal = Number(item.congoma) || 0
               const lVal = Number(item.losAngeles) || 0
               const totalDelDia = cVal + lVal
@@ -660,7 +671,7 @@ export function OverviewDashboard() {
         if (Array.isArray(conteoT1)) {
           conteoT1.forEach((d: any) => {
             if (d && d.fecha) {
-              const normalDate = d.fecha.includes("T") ? d.fecha.split("T")[0] : d.fecha
+              const normalDate = normalizeDateToYMD(d.fecha)
               mapC.set(normalDate, (mapC.get(normalDate) || 0) + (d.cantidad || 0))
             }
           })
@@ -671,7 +682,7 @@ export function OverviewDashboard() {
         if (Array.isArray(conteoT2)) {
           conteoT2.forEach((d: any) => {
             if (d && d.fecha) {
-              const normalDate = d.fecha.includes("T") ? d.fecha.split("T")[0] : d.fecha
+              const normalDate = normalizeDateToYMD(d.fecha)
               mapL.set(normalDate, (mapL.get(normalDate) || 0) + (d.cantidad || 0))
             }
           })
