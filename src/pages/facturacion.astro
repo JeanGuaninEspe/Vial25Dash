@@ -1,29 +1,16 @@
-﻿---
-import '../styles/global.css';
-import { ClientRouter } from 'astro:transitions';
+---
+import MainLayout from '../layouts/main.astro';
 import { SidebarLayout } from '../components/sidebar-layout';
 import { TableFacturacion } from '../components/ui/table-facturacion';
 ---
 
-<!doctype html>
-<html lang="es" class="dark">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
-		<meta name="generator" content={Astro.generator} />
-		<ClientRouter />
-		<title>Facturación - Sistema de Peajes</title>
-	</head>
-
-	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout transition:persist 
-			client:load
-			title="Facturación"
-			description="Gestión de facturas y reportes"
-		>
-			<TableFacturacion client:load />
-		</SidebarLayout>
-	</body>
-</html>
+<MainLayout title="Facturación - Sistema de Peajes">
+	<SidebarLayout transition:persist 
+		client:load
+		title="Facturación"
+		description="Gestión de facturas y reportes"
+	>
+		<TableFacturacion client:load />
+	</SidebarLayout>
+</MainLayout>
 

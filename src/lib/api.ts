@@ -76,6 +76,13 @@ export async function apiFetch(pathOrUrl: string, options: ApiFetchOptions = {})
     return response
   }
 
+  const newToken = getStoredAccessToken()
+  if (newToken) {
+    headers.set("Authorization", `Bearer ${newToken}`)
+  } else {
+    headers.delete("Authorization")
+  }
+
   return fetch(url, {
     credentials: "include",
     ...options,

@@ -1,29 +1,16 @@
-﻿---
-import '../styles/global.css';
-import { ClientRouter } from 'astro:transitions';
+---
+import MainLayout from '../layouts/main.astro';
 import { ChartTemporal } from '../components/ui/chart-temporal';
 import { SidebarLayout } from '../components/sidebar-layout';
 ---
 
-<!doctype html>
-<html lang="es" class="dark">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="icon" type="image/webp" href="/cropped-isotipo-32x32.webp" />
-		<meta name="generator" content={Astro.generator} />
-		<ClientRouter />
-		<title>Análisis Temporal - Sistema Peajes</title>
-	</head>
-
-	<body class="bg-background text-foreground antialiased">
-		<SidebarLayout transition:persist 
-			client:load
-			title="Análisis Temporal Avanzado"
-			description="Patrones de tráfico por día y hora"
-		>
-			<ChartTemporal client:load />
-		</SidebarLayout>
-	</body>
-</html>
+<MainLayout title="Análisis Temporal - Sistema Peajes">
+	<SidebarLayout transition:persist 
+		client:load
+		title="Análisis Temporal Avanzado"
+		description="Patrones de tráfico por día y hora"
+	>
+		<ChartTemporal client:load />
+	</SidebarLayout>
+</MainLayout>
 

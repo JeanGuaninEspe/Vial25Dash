@@ -17,6 +17,13 @@ pnpm-debug.log*
 .env
 .env.production
 
+# SSL certificates and private keys
+*.key
+*.pem
+*.pfx
+*.p12
+*.crt
+
 # macOS-specific files
 .DS_Store
 
