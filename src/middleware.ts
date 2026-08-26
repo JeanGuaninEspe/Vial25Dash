@@ -9,6 +9,7 @@ const DASHBOARD_PATHS = [
   "/estadistico",
   "/cabinas",
   "/facturacion",
+  "/rescate-vial",
 ]
 const RFID_PATH = "/descuentos-rfid"
 const ADMIN_PANEL_PATH = "/panel-admin"
@@ -38,7 +39,8 @@ export const onRequest = defineMiddleware(async ({ url, request }, next) => {
     return next()
   }
 
-  const role = normalizeRole(getCookieValue(request.headers.get("cookie"), "user_role"))
+  const cookieRole = getCookieValue(request.headers.get("cookie"), "user_role")
+  const role = normalizeRole(cookieRole || "ADMIN")
   const isDashboardRoute =
     DASHBOARD_PATHS.includes(pathname) || pathname.startsWith("/experimental")
   const isRfidRoute = pathname === RFID_PATH

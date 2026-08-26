@@ -1,0 +1,15 @@
+---
+import MainLayout from '../layouts/main.astro';
+import { SidebarLayout } from "../components/sidebar-layout"
+import { RescateVialDashboard } from "../components/ui/rescate-vial-dashboard"
+---
+
+<MainLayout title="Rescate Vial y Asistencia - Operaciones & Analítica">
+  <SidebarLayout transition:persist
+    client:load
+    title="Rescate Vial & Operaciones"
+    description="Monitoreo de ambulancias, grúas, patrullajes y analítica de hotspots viales."
+  >
+    <RescateVialDashboard client:load />
+  </SidebarLayout>
+</MainLayout>

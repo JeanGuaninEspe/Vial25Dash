@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Compass,
   ShieldCheck,
+  Ambulance,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { canAccessAdminPanel, canAccessDashboards, canAccessRfidModule, normalizeRole } from "@/lib/roles"
@@ -46,6 +47,7 @@ const data = {
       title: "Navegación",
       items: [
         { title: "Vista General", url: "/overview", icon: Home, disabled: false, access: "dashboards" },
+        { title: "Rescate Vial", url: "/rescate-vial", icon: Ambulance, disabled: false, access: "dashboards" },
         {
           title: "Analítica Comparativa",
           url: "/experimental/analitica-comparativa",

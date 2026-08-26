@@ -49,7 +49,15 @@ export function SidebarLayout({ title, description, children }: SidebarLayoutPro
     setUserFullName(sessionName || localName || "Usuario")
 
     if (!hasStoredToken() && typeof window !== "undefined") {
-      window.location.href = "/login"
+      if (import.meta.env.DEV) {
+        localStorage.setItem("access_token", "dev_token")
+        localStorage.setItem("user_role", "ADMIN")
+        localStorage.setItem("user_full_name", "Administrador Sistema")
+        setUserRole("ADMIN")
+        setUserFullName("Administrador Sistema")
+      } else {
+        window.location.href = "/login"
+      }
     }
   }, [hasStoredToken])
 
